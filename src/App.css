@@ -1,0 +1,101 @@
+.app-shell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid var(--border);
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+}
+
+.brand {
+  font-size: 1.25rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.app-nav {
+  display: flex;
+  gap: 1rem;
+}
+
+.app-nav a {
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.app-nav a.active {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 0.25rem;
+}
+
+.app-main {
+  flex: 1;
+  width: min(44rem, 100%);
+  margin: 0 auto;
+  padding: 2rem 1.5rem 3rem;
+}
+
+.page h1 {
+  margin: 0 0 0.75rem;
+  font-size: clamp(1.75rem, 4vw, 2.25rem);
+  line-height: 1.2;
+}
+
+.lede {
+  margin: 0 0 1.5rem;
+  color: var(--muted);
+  max-width: 36rem;
+}
+
+.drop-zone {
+  display: grid;
+  place-content: center;
+  gap: 0.5rem;
+  min-height: 16rem;
+  padding: 2rem;
+  border: 2px dashed var(--border);
+  border-radius: 0.75rem;
+  background: var(--surface);
+  text-align: center;
+}
+
+.drop-zone:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+.drop-zone-label {
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 600;
+}
+
+.drop-zone-hint,
+.room-meta,
+.empty-state {
+  margin: 0;
+  color: var(--muted);
+}
+
+.room-meta {
+  padding: 1rem 1.25rem;
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  background: var(--accent-soft);
+  color: var(--ink);
+}
+
+.empty-state {
+  padding: 1.5rem;
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  background: var(--surface);
+}

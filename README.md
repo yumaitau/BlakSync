@@ -36,6 +36,42 @@ Upstream: https://github.com/syncthing/syncthing
 - Local web GUI (existing Syncthing GUI is the fallback; BlakSync UI is a later ticket)
 - Apache-2.0 to match Syncthing
 
+## What never goes in git
+
+These are device identity or live config. They stay on the device. `.gitignore` already lists them; CI still scans so a force-add does not sneak through.
+
+| File | Why |
+| --- | --- |
+| `cert.pem` / `key.pem` | Device identity. Anyone with `key.pem` can impersonate the device and pull every folder it can see. |
+| `https-cert.pem` / `https-key.pem` | GUI TLS material. |
+| `config.xml` | Folder paths, paired device IDs, and the GUI **API key** (`<apikey>`). |
+| `.env` and anything with API keys or tokens | Same class of secret. Use `.env.example` with empty values if you must document names. |
+
+Do not commit a copy "just for the office node backup". Copy those files onto the office disk with the same permissions you would give the live process, not into this repository.
+
+If one of those files lands in git: treat it as leaked, revoke or rotate ([docs/threat-model.md](docs/threat-model.md)), and scrub history with a maintainer. Deleting it in a follow-up commit is not enough.
+
+## Threat model and a lost laptop
+
+Syncthing has no central file store. The realistic failures are a pairing mistake, a leaked `key.pem`, discovery/relay metadata, and an unlocked office node or laptop.
+
+Read [docs/threat-model.md](docs/threat-model.md) before treating a device as gone. Copy-paste revoke and rotate steps live there. Honest limits in short:
+
+- **Metadata** — file bytes on the wire are encrypted; device IDs, IPs (via global discovery), and folder/file names among peers are not a secret from the services that make pairing work.
+- **Online requirement** — if every copy is offline, nobody can pull. An office node is an always-on disk, not a cloud.
+- **Unlocked disk** — there is no at-rest encryption from Syncthing. Full-disk encryption is the org's job.
+
+## Secret scan (self-hosted)
+
+Pull requests and pushes run Gitleaks on `runs-on: [self-hosted]`. The runner scans the tree locally. Nothing is uploaded to a SaaS secret scanner.
+
+A dummy `key.pem` committed on a test branch must fail that job. Locally:
+
+```bash
+python3 scripts/secret-scan.py --source .
+bash scripts/assert-dummy-key-fails.sh
+```
+
 ## Licence
 
 Apache-2.0, same as Syncthing.

@@ -1,0 +1,33 @@
+# BlakSync secret scan. Runs on the self-hosted runner only.
+# The tree is not uploaded to a SaaS scanner.
+#
+# Extends gitleaks defaults (private keys, tokens) with Syncthing-shaped
+# files: key.pem, GUI <apikey> in config.xml.
+
+title = "BlakSync"
+
+[extend]
+useDefault = true
+
+[[rules]]
+id = "syncthing-gui-apikey"
+description = "Syncthing/BlakSync GUI API key in config.xml — never commit live config"
+regex = '''(?i)<apikey>\s*([A-Za-z0-9_-]{22,64})\s*</apikey>'''
+entropy = 3.5
+keywords = ["apikey"]
+[[rules.allowlists]]
+regexes = [
+    '''(?i)<apikey>\s*(?:REDACTED|YOUR[_-]?GUI[_-]?API[_-]?KEY|changeme|placeholder)\s*</apikey>''',
+]
+
+[[rules]]
+id = "syncthing-device-key-file"
+description = "Syncthing device private key file (key.pem / https-key.pem)"
+path = '''(?i)(?:^|/)(?:https-)?key\.pem$'''
+regex = '''-----BEGIN[ A-Z0-9_-]{0,40}(?:PRIVATE KEY|EC PRIVATE KEY|RSA PRIVATE KEY|ENCRYPTED PRIVATE KEY)'''
+
+[[rules]]
+id = "syncthing-device-cert-file"
+description = "Syncthing device certificate file (cert.pem / https-cert.pem) — keep out of git with the key"
+path = '''(?i)(?:^|/)(?:https-)?cert\.pem$'''
+regex = '''-----BEGIN[ A-Z0-9_-]{0,40}CERTIFICATE'''

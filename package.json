@@ -1,21 +1,17 @@
 {
   "name": "blaksync",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.1.0",
   "type": "module",
-  "bin": {
-    "blaksync": "bin/blaksync.js",
-    "blaksync-gui": "bin/blaksync-gui.js"
-  },
   "scripts": {
-    "blaksync": "node bin/blaksync.js",
-    "gui": "node bin/blaksync-gui.js",
+    "blaksync": "cargo run --quiet --",
+    "gui": "cargo run --quiet -- gui",
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "lint": "oxlint src lib bin test",
+    "lint": "oxlint src vite.config.ts",
     "typecheck": "tsc -b --pretty false",
     "preview": "vite preview",
-    "test": "node --test"
+    "test": "cargo test --all-targets --all-features"
   },
   "dependencies": {
     "react": "^19.2.8",

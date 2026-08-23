@@ -14,3 +14,17 @@ Do not add or stage:
 Use `.env.example` (values empty or placeholders only) when documenting required variables. Prefer GitHub Actions secrets or the org's own secret store for CI and deployment credentials.
 
 If a secret is committed by mistake, rotate it immediately and remove it from history with maintainer help. Do not rely on a follow-up commit alone.
+
+## Checks
+
+The backend is Rust. Node.js is used only to build and validate the React frontend; do not add a Node or Python backend runtime.
+
+```sh
+cargo fmt --all -- --check
+cargo clippy --all-targets --all-features -- -D warnings
+cargo test --all-targets --all-features --locked
+npm ci
+npm run lint
+npm run typecheck
+npm run build
+```

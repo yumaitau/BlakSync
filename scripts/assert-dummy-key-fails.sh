@@ -6,7 +6,8 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
-python3 "$ROOT/scripts/secret-scan.py" --self-test
+cargo run --locked --quiet --manifest-path "$ROOT/Cargo.toml" \
+  --bin blaksync-secret-scan -- --self-test
 
 if [[ -n "${GITLEAKS_BIN:-}" && -x "${GITLEAKS_BIN}" ]]; then
   work="$(mktemp -d "${TMPDIR:-/tmp}/blaksync-gitleaks-XXXXXX")"
@@ -14,7 +15,8 @@ if [[ -n "${GITLEAKS_BIN:-}" && -x "${GITLEAKS_BIN}" ]]; then
   git init -q "$work"
   git -C "$work" config user.email "ci@blaksync.example"
   git -C "$work" config user.name "BlakSync CI"
-  python3 "$ROOT/scripts/secret-scan.py" --write-dummy-key "$work/key.pem"
+  cargo run --locked --quiet --manifest-path "$ROOT/Cargo.toml" \
+    --bin blaksync-secret-scan -- --write-dummy-key "$work/key.pem"
   git -C "$work" add -f key.pem
   git -C "$work" commit -qm "test: dummy key.pem"
   set +e

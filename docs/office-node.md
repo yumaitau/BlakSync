@@ -4,9 +4,11 @@ An office node is an ordinary Syncthing device with a clear role and an org-owne
 
 ## Linux installation
 
-Install Syncthing and Node.js 22 or newer, then run as root once:
+Build the release binary on a trusted Rust 1.85+ build host, install Syncthing on the office node, then run as root once. Node.js is needed only if that build host also compiles the React GUI.
 
 ```sh
+cargo build --release --locked
+install -o root -g root -m 0755 target/release/blaksync /usr/local/bin/blaksync
 useradd --system --home-dir /srv/blaksync --shell /usr/sbin/nologin blaksync
 install -d -o blaksync -g blaksync -m 0700 /srv/blaksync/config /srv/blaksync/folders
 install -o root -g root -m 0644 deploy/blaksync-office.service /etc/systemd/system/blaksync-office.service
@@ -20,9 +22,9 @@ From this repository, add each accepted folder to the standard disk layout:
 
 ```sh
 export BLAKSYNC_API_KEY='local-api-key'
-npm run blaksync -- office-folder --folder shared-work --label 'Shared work'
-npm run blaksync -- share --folder shared-work --device LAPTOP_DEVICE_ID
-npm run blaksync -- health
+/usr/local/bin/blaksync office-folder --folder shared-work --label 'Shared work'
+/usr/local/bin/blaksync share --folder shared-work --device LAPTOP_DEVICE_ID
+/usr/local/bin/blaksync health
 ```
 
 `office-folder` always creates a `sendreceive` Syncthing configuration at `/srv/blaksync/folders/<folder-id>`. Set `BLAKSYNC_ORG_ROOT` to another absolute, org-owned mount before running it if `/srv` is not on the intended disk. Create and ownership-adjust that root first. The `health` output contains only folder IDs, state, aggregate out-of-sync item counts, free bytes, device IDs, connection state, and last-seen times—never file names.

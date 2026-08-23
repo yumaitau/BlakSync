@@ -147,7 +147,7 @@ export CONFIG_DIR="${BLAKSYNC_HOME:-$HOME/.config/blaksync}"
 # Stop BlakSync / Syncthing first
 # Replace the value inside <apikey>...</apikey> with a fresh 32+ character random string
 # Example generator (prints a key; paste it into config.xml — do not commit it):
-python3 -c 'import secrets; print(secrets.token_urlsafe(32))'
+openssl rand -base64 32
 # Start again. Update any scripts that stored the old API key.
 ```
 
@@ -161,7 +161,7 @@ To replay the dummy-key failure on a real branch:
 
 ```bash
 git checkout -b ci/dummy-key-should-fail
-python3 scripts/secret-scan.py --write-dummy-key key.pem
+cargo run --locked --bin blaksync-secret-scan -- --write-dummy-key key.pem
 git add -f key.pem
 git commit -m "test: dummy key.pem must fail secret scan"
 git push -u origin HEAD

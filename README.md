@@ -1,38 +1,41 @@
 # BlakSync
 
-Peer-to-peer file copy and sharing for Australian Indigenous organisations.
-Encrypted transfers stay between devices. Files can also sit in an encrypted org store that the org controls. Built for Country, not the cloud.
+Peer-to-peer folder sync and sharing for Australian Indigenous organisations.
+Devices talk to each other. There is no Dropbox, iCloud, or OneDrive in the middle. Built for Country, not the cloud.
 
 Public repo: https://github.com/jusso-dev/BlakSync
 
 ## Why it exists
 
-Most file tools upload everything to someone else's datacentre. That is a poor fit for land, heritage, and community records. BlakSync is a browser-first share tool in the same family as serverless WebRTC drop-and-link apps, plus an optional encrypted store that never leaves the org's machines unless they choose to send a copy.
+Louis Gleeson posted about [Syncthing](https://syncthing.net) as a $0 replacement for cloud drive subscriptions. That model is right: devices connect directly, transfers are TLS with perfect forward secrecy, each device has a certificate, nothing moves without permission.
 
-Inspired by the drop-a-file, share-a-link pattern (see [this post](https://x.com/aigleeson/status/2091102436438188479)). BlakSync is not a clone of that product. It is a sovereign share and store tool for Indigenous orgs in Australia.
+BlakSync is that idea aimed at Indigenous orgs. Same engine (Syncthing, Apache-2.0), plus org tenancy, cultural access notes, and a quieter UI. We do not reimplement the Block Exchange Protocol in v1.
+
+Source for the tweet: https://x.com/aigleeson/status/2091102436438188479
+Upstream: https://github.com/syncthing/syncthing
 
 ## What v1 does
 
-- Drop a file or folder in the browser, get a link or QR, send it to another person or another org device.
-- Bytes travel on an end-to-end encrypted WebRTC data channel. Signalling only carries handshake metadata.
-- Optional encrypted store on a device the org owns (homelab, office NAS, or a small VM). Peers can pull or push against that store when the owner is online.
-- Org tenancy, roles, and consent notes so cultural access rules can be recorded on a share.
-- Works on poor links: pause, resume, retry, TURN fallback, and a clear "still waiting for the other device" state.
+- Install on Windows, macOS, Linux, and Android. Pair devices with a device ID and an explicit share.
+- Sync named folders (photos, work docs, heritage scans) continuously when devices are online.
+- No account, no subscription, no copy of the files on a company server.
+- Org profile, roles, and an access note on each shared folder.
+- Local web GUI plus a CLI. Discovery via local LAN and optional global discovery the org can turn off.
+- Self-hosted CI on `runs-on: [self-hosted]`.
 
 ## What v1 does not do
 
-- No public internet upload of file contents as the primary path.
-- No analytics or third-party identity beyond what the org configures.
-- No claim that this replaces legal cultural heritage systems. It is a share and store tool.
+- Not a browser-only drop-a-file link (that was a wrong first cut).
+- Not a public cloud bucket.
+- No claim this replaces a legal cultural heritage register.
 
 ## Stack (locked for first cut)
 
-- TypeScript, Vite, React
-- WebRTC data channels, STUN plus optional TURN
-- Signalling: a small self-hosted service the org runs (WebSocket). Nostr is allowed as a later option, not v1.
-- Encrypted store: libsodium / age-style file encryption, keys held by the org
-- CI on self-hosted runners (`runs-on: [self-hosted]`)
+- Syncthing as the sync engine (vendored or spawned, not forked unless we must)
+- Thin wrapper for org config, access notes, and audit log
+- Local web GUI (existing Syncthing GUI is the fallback; BlakSync UI is a later ticket)
+- Apache-2.0 to match Syncthing
 
 ## Licence
 
-To be added in the first build ticket. Default to Apache-2.0 unless Justin says otherwise.
+Apache-2.0, same as Syncthing.

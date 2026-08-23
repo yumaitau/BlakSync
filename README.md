@@ -1,3 +1,5 @@
+![BlakSync — Built for Country, not the cloud.](docs/assets/blaksync-banner.webp)
+
 # BlakSync
 
 Peer-to-peer folder sync and sharing for Australian Indigenous organisations.

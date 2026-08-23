@@ -12,7 +12,7 @@ Public repo: https://github.com/jusso-dev/BlakSync
 
 ## Interface
 
-Captured from a real two-node container test on the homelab: a paired field laptop, a 2.0 MiB folder, matching synced files, and no cloud service in the middle.
+Current interface shown with representative state from a verified two-node container test on the homelab: a paired field laptop, a 2.0 MiB folder, matching synced files, and no cloud service in the middle.
 
 ![BlakSync Folders showing an up-to-date shared folder and its access note](docs/assets/blaksync-folders-desktop.png)
 

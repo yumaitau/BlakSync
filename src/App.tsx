@@ -9,12 +9,27 @@ import './App.css'
 function App() {
   return (
     <div className="app-shell">
+      <a className="skip-link" href="#main-content">
+        Skip to content
+      </a>
       <header className="app-header">
-        <div className="brand-block">
-          <NavLink to="/" className="brand">
-            BlakSync
-          </NavLink>
-          <p className="brand-tag">Local folder sync. No cloud in the middle.</p>
+        <div className="app-header-inner">
+          <div className="brand-block">
+            <NavLink to="/" className="brand" aria-label="BlakSync folders">
+              <span className="brand-mark" aria-hidden="true" />
+              <span className="brand-name">
+                <span>Blak</span>Sync
+              </span>
+            </NavLink>
+            <p className="brand-tag">Local folder sync. No cloud in the middle.</p>
+          </div>
+          <div className="app-context" aria-label="Connection model">
+            <span className="local-status">
+              <span aria-hidden="true" />
+              Local only
+            </span>
+            <span className="context-copy">Community-controlled sync</span>
+          </div>
         </div>
         <nav className="app-nav" aria-label="Primary">
           <NavLink to="/" end>
@@ -26,7 +41,7 @@ function App() {
           <NavLink to="/settings">Settings</NavLink>
         </nav>
       </header>
-      <main className="app-main">
+      <main id="main-content" tabIndex={-1} className="app-main">
         <Routes>
           <Route path="/" element={<FoldersPage />} />
           <Route path="/this-device" element={<ThisDevicePage />} />

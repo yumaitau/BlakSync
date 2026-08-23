@@ -36,6 +36,48 @@ Upstream: https://github.com/syncthing/syncthing
 - Local web GUI (existing Syncthing GUI is the fallback; BlakSync UI is a later ticket)
 - Apache-2.0 to match Syncthing
 
+## Org overlay
+
+Syncthing has no organisation concept. BlakSync adds a local overlay in one config directory: org profile, roles, a free-text access note on each folder, a pending-device prompt, and a local audit log. The organisation writes the note. BlakSync does not invent ceremony rules.
+
+Each config directory is one organisation. Two config directories cannot see each other's folders. There is no social login. Government ID is not stored.
+
+Roles:
+
+- **owner** — set the org profile, assign roles, accept devices, share folders
+- **admin** — accept devices, share folders, write access notes
+- **member** — sync accepted folders; cannot accept a new device
+
+Default config directory: `--config-dir` or `BLAKSYNC_CONFIG_DIR`, otherwise `~/.config/blaksync` on Linux.
+
+```
+python3 -m blaksync init \
+  --name "Example Land Council" \
+  --timezone Australia/Darwin \
+  --contact it@example.org.au \
+  --actor-id office-node \
+  --actor-name "Office node"
+
+python3 -m blaksync folder-add \
+  --id heritage-scans \
+  --label "Heritage scans" \
+  --note "Speak with the cultural officer before pairing a new device."
+
+python3 -m blaksync pending
+python3 -m blaksync accept --device DEVICEID
+python3 -m blaksync share --folder heritage-scans --device DEVICEID
+python3 -m blaksync unshare --folder heritage-scans --device DEVICEID
+python3 -m blaksync audit-export
+```
+
+Timezone must be an `Australia/*` IANA name. The pending prompt shows the org name, folder labels, who may pair, and the access note before Accept. Members who run `accept` still see the note, then the command fails.
+
+The audit CSV columns are `timestamp,event,actor,role,device_id,folder_label`. Events are `device_accepted`, `folder_shared`, and `folder_unshared`. Paths and file contents are not recorded.
+
+```
+python3 -m unittest discover -s tests -v
+```
+
 ## Licence
 
 Apache-2.0, same as Syncthing.

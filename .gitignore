@@ -1,0 +1,70 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Dependencies and build
+node_modules
+dist
+dist-ssr
+*.local
+
+# Environment and secrets — never commit these
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+cert.pem
+key.pem
+https-cert.pem
+https-key.pem
+config.xml
+id_rsa
+id_rsa.*
+id_ed25519
+id_ed25519.*
+*.secret
+secrets/
+keys/
+
+# Local BlakSync / Syncthing runtime data
+.config/blaksync/
+.blaksync/
+index-v*/
+index-*.db
+index-v*.db
+csrftokens.txt
+syncthing.log
+audit-*.log
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+build/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?

@@ -101,8 +101,10 @@ def blob_at(cwd: Path, rev: str, path: str) -> str | None:
 
 
 def revisions(cwd: Path) -> list[str]:
+    # HEAD only: do not walk unrelated local branches (a dummy-key fixture
+    # branch must not fail the review branch sitting in the same clone).
     try:
-        out = git(["rev-list", "--all"], cwd)
+        out = git(["rev-list", "HEAD"], cwd)
     except subprocess.CalledProcessError:
         return []
     return [line for line in out.splitlines() if line]

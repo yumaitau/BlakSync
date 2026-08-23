@@ -36,6 +36,27 @@ Upstream: https://github.com/syncthing/syncthing
 - Local web GUI on 127.0.0.1 (Syncthing's own GUI stays as fallback)
 - Apache-2.0 to match Syncthing
 
+## Install and start Syncthing
+
+Install Node.js 22 or newer and the official Syncthing package for your platform. On Linux, install Syncthing from your distribution or the upstream package repository. On macOS, use the official package or Homebrew. On Windows, install the official package and put `syncthing.exe` on `PATH`.
+
+Then start Syncthing under BlakSync's dedicated config directory:
+
+```sh
+npm ci
+npm run blaksync -- start
+```
+
+On first run, the wrapper generates `~/.config/blaksync`, prints the local GUI URL and certificate-derived device ID, then runs Syncthing in the foreground. The GUI is forced to `127.0.0.1:8384`. Stop with Ctrl-C. Override binary or config location when needed:
+
+```sh
+npm run blaksync -- start --syncthing /opt/syncthing --home /srv/blaksync/config
+```
+
+Global discovery and relays keep Syncthing's defaults. LAN discovery works without internet access. To keep metadata off global discovery or run Tailscale-only, change Syncthing's connection settings as described in [the threat model](docs/threat-model.md) and [office-node guide](docs/office-node.md).
+
+Optional: `npm link` exposes the same wrapper as `blaksync start` for this checkout.
+
 ## Local web GUI
 
 Build once, then start the BlakSync GUI. It binds to `127.0.0.1:8385` by default and talks to Syncthing through the same API key as the CLI. No third-party analytics. No CDN fonts.
@@ -60,7 +81,7 @@ npm run dev
 
 ## Pair and share from the CLI
 
-Requires Node.js 22 or newer, npm, and a running Syncthing instance. Install JavaScript dependencies with `npm ci`. BlakSync controls Syncthing through its local REST API; it does not proxy or store files. Create an API key under **Actions → Settings → GUI**, and keep the GUI bound to localhost. The key is read only from the environment and is never printed:
+Requires the running Syncthing instance started above. BlakSync controls Syncthing through its local REST API; it does not proxy or store files. Create an API key under **Actions → Settings → GUI**, and keep the GUI bound to localhost. The key is read only from the environment and is never printed:
 
 ```sh
 export BLAKSYNC_API_KEY='your-local-syncthing-api-key'

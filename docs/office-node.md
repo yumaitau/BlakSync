@@ -32,7 +32,7 @@ npm run blaksync -- health
 To keep the sync port off public interfaces, give the office node a stable Tailscale IP and in Syncthing **Settings → Connections**:
 
 1. Set **Sync Protocol Listen Addresses** to `tcp://TAILSCALE_IP:22000` (and optionally `quic://TAILSCALE_IP:22000`).
-2. Disable Global Discovery, Enable Relaying, and NAT traversal. Local Discovery may remain enabled only if LAN peers are wanted.
+2. Disable Global Discovery, Relaying, and NAT traversal. Local Discovery may remain enabled only if LAN peers are wanted.
 3. Set each laptop's address for the office node to `tcp://TAILSCALE_IP:22000`, or allow Tailscale DNS and use that stable name.
 4. Restrict port 22000 with the host firewall and Tailscale ACLs. Keep the GUI at `127.0.0.1:8384`.
 

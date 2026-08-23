@@ -35,7 +35,12 @@ before(async () => {
     }
     if (url.pathname === "/rest/config/gui") return send(response, 200, { address: "127.0.0.1:8384" });
     if (url.pathname === "/rest/config/options") return send(response, 200, {});
-    if (url.pathname === "/rest/stats/device") return send(response, 200, { [PEER_ID]: { lastSeen: "2026-08-23T03:00:00Z" } });
+    if (url.pathname === "/rest/stats/device") {
+      return send(response, 200, {
+        [OWN_ID]: { lastSeen: "1970-01-01T00:00:00Z" },
+        [PEER_ID]: { lastSeen: "2026-08-23T03:00:00Z" },
+      });
+    }
     if (url.pathname === "/rest/config/defaults/device") return send(response, 200, { addresses: ["dynamic"], paused: false });
     if (url.pathname === "/rest/config/defaults/folder") return send(response, 200, { devices: [{ deviceID: OWN_ID }], type: "sendreceive" });
     if (url.pathname === "/rest/config/devices" && request.method === "GET") return send(response, 200, devices);
@@ -246,6 +251,33 @@ describe("BlakSync GUI API", () => {
     });
     assert.equal(gui.host, "127.0.0.1");
     assert.equal(gui.port, 8385);
+  });
+
+  test("rejects cross-origin browser mutations", async () => {
+    const gui = createGuiServer({
+      host: "127.0.0.1",
+      port: 0,
+      configDir,
+      staticRoot: path.join(configDir, "empty-static"),
+      clientFactory: () => makeClient(),
+    });
+    await new Promise((resolve, reject) => {
+      gui.server.listen(0, "127.0.0.1", resolve);
+      gui.server.once("error", reject);
+    });
+    const port = gui.server.address().port;
+
+    try {
+      const response = await fetch(`http://127.0.0.1:${port}/api/folders`, {
+        method: "POST",
+        headers: { "content-type": "application/json", origin: "https://example.invalid" },
+        body: JSON.stringify({ id: "should-not-exist", path: "/tmp/should-not-exist" }),
+      });
+      assert.equal(response.status, 403);
+      assert.equal(folders.length, 0);
+    } finally {
+      await gui.close();
+    }
   });
 });
 

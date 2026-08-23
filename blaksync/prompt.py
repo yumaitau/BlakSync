@@ -4,6 +4,8 @@ The organisation writes each access note. BlakSync does not invent ceremony rule
 Filesystem paths are not shown.
 """
 
+from __future__ import annotations
+
 from dataclasses import dataclass, field
 
 

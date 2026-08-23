@@ -3,6 +3,10 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "bin": {
+    "blaksync": "bin/blaksync.js",
+    "blaksync-gui": "bin/blaksync-gui.js"
+  },
   "scripts": {
     "blaksync": "node bin/blaksync.js",
     "gui": "node bin/blaksync-gui.js",

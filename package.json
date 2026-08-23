@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "blaksync": "node bin/blaksync.js",
+    "gui": "node bin/blaksync-gui.js",
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "oxlint src lib bin test",

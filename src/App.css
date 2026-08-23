@@ -6,96 +6,323 @@
 
 .app-header {
   display: flex;
-  align-items: center;
+  flex-wrap: wrap;
+  align-items: flex-end;
   justify-content: space-between;
-  gap: 1rem;
-  padding: 1rem 1.5rem;
+  gap: 1rem 1.5rem;
+  padding: 1rem 1.25rem;
   border-bottom: 1px solid var(--border);
-  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+}
+
+.brand-block {
+  display: grid;
+  gap: 0.15rem;
 }
 
 .brand {
-  font-size: 1.25rem;
+  font-size: 1.5rem;
   font-weight: 700;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.01em;
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.brand-tag {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.95rem;
 }
 
 .app-nav {
   display: flex;
-  gap: 1rem;
+  flex-wrap: wrap;
+  gap: 0.65rem 1rem;
 }
 
 .app-nav a {
   color: var(--muted);
-  font-weight: 500;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.app-nav a:hover,
+.app-nav a:focus-visible {
+  color: var(--ink);
 }
 
 .app-nav a.active {
   color: var(--accent);
   text-decoration: underline;
-  text-underline-offset: 0.25rem;
+  text-underline-offset: 0.28rem;
 }
 
 .app-main {
   flex: 1;
-  width: min(44rem, 100%);
+  width: min(72rem, 100%);
   margin: 0 auto;
-  padding: 2rem 1.5rem 3rem;
+  padding: 1.5rem 1.25rem 3rem;
 }
 
 .page h1 {
-  margin: 0 0 0.75rem;
-  font-size: clamp(1.75rem, 4vw, 2.25rem);
+  margin: 0 0 0.5rem;
+  font-size: clamp(1.6rem, 3.5vw, 2rem);
   line-height: 1.2;
 }
 
+.section-title {
+  margin: 1.75rem 0 0.75rem;
+  font-size: 1.15rem;
+}
+
 .lede {
-  margin: 0 0 1.5rem;
+  margin: 0 0 1.25rem;
   color: var(--muted);
-  max-width: 36rem;
+  max-width: 40rem;
 }
 
-.drop-zone {
-  display: grid;
-  place-content: center;
-  gap: 0.5rem;
-  min-height: 16rem;
-  padding: 2rem;
-  border: 2px dashed var(--border);
-  border-radius: 0.75rem;
-  background: var(--surface);
-  text-align: center;
+.page-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.5rem;
 }
 
-.drop-zone:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 3px;
-}
-
-.drop-zone-label {
-  margin: 0;
-  font-size: 1.125rem;
-  font-weight: 600;
-}
-
-.drop-zone-hint,
-.room-meta,
-.empty-state {
-  margin: 0;
-  color: var(--muted);
-}
-
-.room-meta {
-  padding: 1rem 1.25rem;
+.panel {
+  padding: 1rem 1.1rem;
   border: 1px solid var(--border);
-  border-radius: 0.5rem;
-  background: var(--accent-soft);
+  background: var(--surface);
+  margin-bottom: 1rem;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.85rem 1rem;
+}
+
+.form-grid label,
+.inline-field {
+  display: grid;
+  gap: 0.35rem;
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+.span-2 {
+  grid-column: 1 / -1;
+}
+
+input,
+textarea,
+select,
+button {
+  font: inherit;
+}
+
+input,
+textarea,
+select {
+  width: 100%;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid var(--border);
+  background: #fff;
   color: var(--ink);
 }
 
-.empty-state {
-  padding: 1.5rem;
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible,
+button:focus-visible,
+a:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.4rem;
+  padding: 0.4rem 0.85rem;
   border: 1px solid var(--border);
-  border-radius: 0.5rem;
   background: var(--surface);
+  color: var(--ink);
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.btn.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #f7f8f6;
+}
+
+.btn.danger {
+  color: var(--danger);
+  border-color: color-mix(in srgb, var(--danger) 45%, var(--border));
+}
+
+.row-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.85rem;
+}
+
+.row-card {
+  display: grid;
+  gap: 1rem;
+  padding: 1rem 1.1rem;
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
+
+@media (min-width: 900px) {
+  .row-card {
+    grid-template-columns: 1fr auto;
+    align-items: start;
+  }
+}
+
+.row-main h2,
+.row-main h3 {
+  margin: 0 0 0.35rem;
+  font-size: 1.15rem;
+}
+
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem 1rem;
+  margin: 0 0 0.45rem;
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+
+.path,
+.shared-with,
+.access-note,
+.muted {
+  margin: 0.35rem 0 0;
+  color: var(--muted);
+}
+
+.access-note {
+  padding: 0.65rem 0.75rem;
+  background: var(--accent-soft);
+  color: var(--ink);
+  border-left: 3px solid var(--accent);
+}
+
+.note-label {
+  display: block;
+  font-weight: 700;
+  margin-bottom: 0.25rem;
+}
+
+.access-note-block {
+  margin-top: 0.75rem;
+  padding: 0.75rem;
+  background: var(--accent-soft);
+  border-left: 3px solid var(--accent);
+}
+
+.note-list {
+  margin: 0.35rem 0 0;
+  padding-left: 1.1rem;
+}
+
+.row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.status {
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.status-up-to-date {
+  color: var(--accent);
+}
+
+.status-syncing,
+.status-preparing {
+  color: var(--warn);
+}
+
+.status-paused,
+.status-unshared {
+  color: var(--muted);
+}
+
+.banner {
+  margin: 0 0 1rem;
+  padding: 0.7rem 0.85rem;
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.banner.error {
+  border-color: color-mix(in srgb, var(--danger) 40%, var(--border));
+  color: var(--danger);
+}
+
+.empty-state {
+  margin: 0;
+  padding: 1.1rem;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--muted);
+}
+
+.detail-grid {
+  display: grid;
+  gap: 1rem;
+}
+
+.detail-grid dt {
+  font-weight: 700;
+  margin: 0 0 0.2rem;
+}
+
+.detail-grid dd {
+  margin: 0;
+  color: var(--muted);
+}
+
+.device-id {
+  display: inline-block;
+  max-width: 100%;
+}
+
+@media (max-width: 640px) {
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .app-header {
+    align-items: flex-start;
+  }
+
+  .app-nav {
+    width: 100%;
+  }
 }

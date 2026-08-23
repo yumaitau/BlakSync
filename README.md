@@ -33,8 +33,30 @@ Upstream: https://github.com/syncthing/syncthing
 
 - Syncthing as the sync engine (vendored or spawned, not forked unless we must)
 - Thin wrapper for org config, access notes, and audit log
-- Local web GUI (existing Syncthing GUI is the fallback; BlakSync UI is a later ticket)
+- Local web GUI on 127.0.0.1 (Syncthing's own GUI stays as fallback)
 - Apache-2.0 to match Syncthing
+
+## Local web GUI
+
+Build once, then start the BlakSync GUI. It binds to `127.0.0.1:8385` by default and talks to Syncthing through the same API key as the CLI. No third-party analytics. No CDN fonts.
+
+```sh
+npm ci
+npm run build
+export BLAKSYNC_API_KEY='your-local-syncthing-api-key'
+npm run gui
+```
+
+Open http://127.0.0.1:8385. Pages cover Folders, This device, Remote devices, Pending, and Settings. From Folders you can add a folder (with an access note), share it with a paired device, pause, or unshare. Pending shows access notes before Accept or Deny.
+
+For local frontend work without rebuilding:
+
+```sh
+# terminal 1 — API only (serves /api; build first if you also want static files)
+npm run gui
+# terminal 2 — Vite on 127.0.0.1:5173, proxies /api
+npm run dev
+```
 
 ## Pair and share from the CLI
 
@@ -62,9 +84,12 @@ Create and explicitly offer a folder on A:
 
 ```sh
 mkdir -p "$PWD/sync-test"
-npm run blaksync -- add-folder --folder sync-test --path "$PWD/sync-test" --label 'Sync test'
+npm run blaksync -- add-folder --folder sync-test --path "$PWD/sync-test" --label 'Sync test' \
+  --note 'Speak with the cultural officer before pairing a new device.'
 npm run blaksync -- share --folder sync-test --device DEVICE_ID_OF_B
 ```
+
+The same flow works in the BlakSync GUI without opening Syncthing's stock UI.
 
 Nothing is copied to B until B accepts the offered folder ID and chooses a local path:
 

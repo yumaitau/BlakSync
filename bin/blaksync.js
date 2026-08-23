@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { SyncthingClient } from "../lib/syncthing.js";
+import { AccessNotesStore } from "../lib/access-notes.js";
 
 const [command, ...args] = process.argv.slice(2);
 if (!command || command === "--help") usage(command ? 0 : 1);
@@ -8,19 +9,31 @@ try {
   const options = parseOptions(args);
   if (options.help) usage(0);
   const client = new SyncthingClient({ baseUrl: process.env.BLAKSYNC_URL, apiKey: process.env.BLAKSYNC_API_KEY });
+  const notes = new AccessNotesStore();
   let result;
   switch (command) {
     case "device-id": result = { deviceId: await client.getDeviceId() }; break;
     case "pending-devices": result = await client.listPendingDevices(); break;
     case "devices": result = await client.listDevices(); break;
     case "add-device": result = await client.addDevice(required(options, "device"), options.name); break;
-    case "add-folder": result = await client.addFolder(required(options, "folder"), required(options, "path"), options.label); break;
+    case "deny-device": await client.denyPendingDevice(required(options, "device")); result = { denied: true }; break;
+    case "add-folder": {
+      result = await client.addFolder(required(options, "folder"), required(options, "path"), options.label);
+      if (options.note !== undefined) await notes.set(required(options, "folder"), options.note);
+      break;
+    }
+    case "set-note": result = { accessNote: await notes.set(required(options, "folder"), options.note ?? "") }; break;
     case "accept-folder": result = await client.addFolder(required(options, "folder"), required(options, "path"), options.label); await client.shareFolder(required(options, "folder"), required(options, "device")); break;
     case "share": await client.shareFolder(required(options, "folder"), required(options, "device")); result = { shared: true }; break;
     case "unshare": await client.unshareFolder(required(options, "folder"), required(options, "device")); result = { shared: false }; break;
     case "pause": await client.setFolderPaused(required(options, "folder"), true); result = { paused: true }; break;
     case "resume": await client.setFolderPaused(required(options, "folder"), false); result = { paused: false }; break;
     case "status": result = await client.listFolderStatus(); break;
+    case "gui": {
+      console.error("Start the GUI with: npm run gui");
+      process.exitCode = 1;
+      break;
+    }
     default: throw new Error(`Unknown command: ${command}`);
   }
   if (result !== undefined) console.log(JSON.stringify(result, null, 2));
@@ -51,12 +64,17 @@ Commands:
   pending-devices
   devices
   add-device --device ID [--name NAME]
-  add-folder --folder ID --path PATH [--label LABEL]
+  deny-device --device ID
+  add-folder --folder ID --path PATH [--label LABEL] [--note TEXT]
+  set-note --folder ID --note TEXT
   accept-folder --folder ID --path PATH --device ID [--label LABEL]
   share --folder ID --device ID
   unshare --folder ID --device ID
   pause --folder ID
   resume --folder ID
-  status`);
+  status
+
+Web GUI:
+  npm run gui`);
   process.exit(code);
 }

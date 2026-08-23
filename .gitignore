@@ -46,7 +46,17 @@ audit-*.log
 
 # Python
 __pycache__/
-*.pyc
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+build/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.coverage
+htmlcov/
 
 # Editor directories and files
 .vscode/*

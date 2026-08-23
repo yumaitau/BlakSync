@@ -1,0 +1,22 @@
+[Unit]
+Description=BlakSync office node (Syncthing)
+Documentation=https://github.com/jusso-dev/BlakSync
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=blaksync
+Group=blaksync
+UMask=0077
+ExecStart=/usr/bin/syncthing serve --no-browser --no-restart --home=/srv/blaksync/config --gui-address=127.0.0.1:8384
+Restart=on-failure
+RestartSec=5s
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/srv/blaksync
+
+[Install]
+WantedBy=multi-user.target

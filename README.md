@@ -99,6 +99,10 @@ Automated REST wrapper tests use a local fake Syncthing HTTP instance and never 
 npm test
 ```
 
+## Office node
+
+See [the office node guide](docs/office-node.md) for the org-owned disk layout, reboot-safe systemd service, aggregate health command, Windows service note, and optional Tailscale-only transport.
+
 ## Licence
 
 Apache License 2.0, same as Syncthing. See [LICENSE](LICENSE).

@@ -15,12 +15,14 @@ try {
     case "devices": result = await client.listDevices(); break;
     case "add-device": result = await client.addDevice(required(options, "device"), options.name); break;
     case "add-folder": result = await client.addFolder(required(options, "folder"), required(options, "path"), options.label); break;
+    case "office-folder": result = await client.addOfficeFolder(required(options, "folder"), process.env.BLAKSYNC_ORG_ROOT, options.label); break;
     case "accept-folder": result = await client.addFolder(required(options, "folder"), required(options, "path"), options.label); await client.shareFolder(required(options, "folder"), required(options, "device")); break;
     case "share": await client.shareFolder(required(options, "folder"), required(options, "device")); result = { shared: true }; break;
     case "unshare": await client.unshareFolder(required(options, "folder"), required(options, "device")); result = { shared: false }; break;
     case "pause": await client.setFolderPaused(required(options, "folder"), true); result = { paused: true }; break;
     case "resume": await client.setFolderPaused(required(options, "folder"), false); result = { paused: false }; break;
     case "status": result = await client.listFolderStatus(); break;
+    case "health": result = await client.getOfficeHealth(); break;
     default: throw new Error(`Unknown command: ${command}`);
   }
   if (result !== undefined) console.log(JSON.stringify(result, null, 2));
@@ -52,11 +54,13 @@ Commands:
   devices
   add-device --device ID [--name NAME]
   add-folder --folder ID --path PATH [--label LABEL]
+  office-folder --folder ID [--label LABEL]
   accept-folder --folder ID --path PATH --device ID [--label LABEL]
   share --folder ID --device ID
   unshare --folder ID --device ID
   pause --folder ID
   resume --folder ID
-  status`);
+  status
+  health`);
   process.exit(code);
 }

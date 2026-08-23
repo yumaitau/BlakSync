@@ -1,0 +1,45 @@
+:root {
+  color: #1c1917;
+  background: #f5f0e8;
+  font-family: 'Segoe UI', 'Helvetica Neue', sans-serif;
+  font-synthesis: none;
+  line-height: 1.5;
+  font-weight: 400;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+
+  --ink: #1c1917;
+  --muted: #57534e;
+  --surface: #fffdf8;
+  --border: #d6d3d1;
+  --accent: #0f766e;
+  --accent-soft: #ccfbf1;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  background:
+    radial-gradient(ellipse at top left, #efe6d6 0%, transparent 55%),
+    radial-gradient(ellipse at bottom right, #d8efe9 0%, transparent 50%),
+    #f5f0e8;
+  color: var(--ink);
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+code {
+  font-family: ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, monospace;
+  font-size: 0.95em;
+}

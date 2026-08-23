@@ -33,6 +33,38 @@ Inspired by the drop-a-file, share-a-link pattern (see [this post](https://x.com
 - Encrypted store: libsodium / age-style file encryption, keys held by the org
 - CI on self-hosted runners (`runs-on: [self-hosted]`)
 
+## Build and run
+
+Requires Node.js 22 or newer and npm.
+
+```bash
+git clone https://github.com/jusso-dev/BlakSync.git
+cd BlakSync
+npm ci
+npm run dev
+```
+
+Open the printed localhost URL (Vite defaults to http://localhost:5173). The home page is a drop zone stub. Placeholder routes:
+
+- `/` — send / drop zone
+- `/receive/:room` — receive stub for a room code
+- `/library` — organisation library stub
+
+Other scripts:
+
+```bash
+npm run lint
+npm run typecheck
+npm run build
+npm run preview
+```
+
+`npm ci && npm run build` must succeed locally and in CI.
+
 ## Licence
 
-To be added in the first build ticket. Default to Apache-2.0 unless Justin says otherwise.
+Apache License 2.0. See [LICENSE](LICENSE).
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md). Agents must not commit secrets, private keys, or `.env` files with real values.

@@ -4,7 +4,7 @@ import { createServer } from "node:http";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { SyncthingClient } from "../lib/syncthing.js";
+import { SyncthingClient, officeFolderPath } from "../lib/syncthing.js";
 import { AccessNotesStore } from "../lib/access-notes.js";
 import { createGuiServer } from "../lib/gui-server.js";
 
@@ -18,6 +18,7 @@ let devices;
 let pendingDevices;
 let deniedDevices;
 let configDir;
+let needTotalItems;
 
 before(async () => {
   server = createServer(async (request, response) => {
@@ -34,6 +35,7 @@ before(async () => {
     }
     if (url.pathname === "/rest/config/gui") return send(response, 200, { address: "127.0.0.1:8384" });
     if (url.pathname === "/rest/config/options") return send(response, 200, {});
+    if (url.pathname === "/rest/stats/device") return send(response, 200, { [PEER_ID]: { lastSeen: "2026-08-23T03:00:00Z" } });
     if (url.pathname === "/rest/config/defaults/device") return send(response, 200, { addresses: ["dynamic"], paused: false });
     if (url.pathname === "/rest/config/defaults/folder") return send(response, 200, { devices: [{ deviceID: OWN_ID }], type: "sendreceive" });
     if (url.pathname === "/rest/config/devices" && request.method === "GET") return send(response, 200, devices);
@@ -65,7 +67,7 @@ before(async () => {
         state: "idle",
         needBytes: 0,
         needFiles: 0,
-        needTotalItems: 0,
+        needTotalItems,
         globalBytes: 1048576,
         localBytes: 1048576,
       });
@@ -87,6 +89,7 @@ beforeEach(async () => {
   devices = [{ deviceID: OWN_ID, name: "Office node" }];
   pendingDevices = { [PEER_ID]: { name: "Field laptop", address: "tcp://192.168.1.20:22000" } };
   deniedDevices = [];
+  needTotalItems = 0;
   if (configDir) await rm(configDir, { recursive: true, force: true });
   configDir = await mkdtemp(path.join(tmpdir(), "blaksync-notes-"));
 });
@@ -136,6 +139,27 @@ describe("Syncthing REST wrapper", () => {
     await client.denyPendingDevice(PEER_ID);
     assert.deepEqual(deniedDevices, [PEER_ID]);
     assert.equal(Object.keys(pendingDevices).length, 0);
+  });
+
+  test("office folders use the org disk and send-receive mode", async () => {
+    const client = makeClient();
+    const folder = await client.addOfficeFolder("country-docs", "/org-owned", "Country docs");
+    assert.equal(folder.path, "/org-owned/folders/country-docs");
+    assert.equal(folder.type, "sendreceive");
+    assert.throws(() => officeFolderPath("../escape", "/org-owned"));
+    assert.throws(() => officeFolderPath("valid", "relative"));
+  });
+
+  test("health reports aggregate counts, last seen, and free disk without file names", async () => {
+    const client = new SyncthingClient({ baseUrl, apiKey: "test-key", statfsImpl: async () => ({ bavail: 25n, bsize: 4096n }) });
+    await client.addOfficeFolder("country-docs", "/org-owned");
+    needTotalItems = 3;
+    await client.shareFolder("country-docs", PEER_ID);
+    const health = await client.getOfficeHealth();
+    assert.deepEqual(health.folders, [{ id: "country-docs", status: "Syncing", outOfSyncItems: 3, freeDiskBytes: 102400 }]);
+    assert.deepEqual(health.devices, [{ deviceId: PEER_ID, connected: true, lastSeen: "2026-08-23T03:00:00Z" }]);
+    assert.equal(JSON.stringify(health).includes("path"), false);
+    assert.equal(JSON.stringify(health).includes("name"), false);
   });
 
   test("does not include the API key in an error", async () => {

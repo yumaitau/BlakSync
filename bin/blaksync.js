@@ -23,6 +23,7 @@ try {
       break;
     }
     case "set-note": result = { accessNote: await notes.set(required(options, "folder"), options.note ?? "") }; break;
+    case "office-folder": result = await client.addOfficeFolder(required(options, "folder"), process.env.BLAKSYNC_ORG_ROOT, options.label); break;
     case "accept-folder": result = await client.addFolder(required(options, "folder"), required(options, "path"), options.label); await client.shareFolder(required(options, "folder"), required(options, "device")); break;
     case "share": await client.shareFolder(required(options, "folder"), required(options, "device")); result = { shared: true }; break;
     case "unshare": await client.unshareFolder(required(options, "folder"), required(options, "device")); result = { shared: false }; break;
@@ -34,6 +35,7 @@ try {
       process.exitCode = 1;
       break;
     }
+    case "health": result = await client.getOfficeHealth(); break;
     default: throw new Error(`Unknown command: ${command}`);
   }
   if (result !== undefined) console.log(JSON.stringify(result, null, 2));
@@ -67,12 +69,14 @@ Commands:
   deny-device --device ID
   add-folder --folder ID --path PATH [--label LABEL] [--note TEXT]
   set-note --folder ID --note TEXT
+  office-folder --folder ID [--label LABEL]
   accept-folder --folder ID --path PATH --device ID [--label LABEL]
   share --folder ID --device ID
   unshare --folder ID --device ID
   pause --folder ID
   resume --folder ID
   status
+  health
 
 Web GUI:
   npm run gui`);

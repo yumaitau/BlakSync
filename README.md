@@ -202,6 +202,10 @@ The audit CSV columns are `timestamp,event,actor,role,device_id,folder_label`. E
 python3 -m unittest discover -s tests -v
 ```
 
+## Office node
+
+See [the office node guide](docs/office-node.md) for the org-owned disk layout, reboot-safe systemd service, aggregate health command, Windows service note, and optional Tailscale-only transport.
+
 ## Licence
 
 Apache License 2.0, same as Syncthing. See [LICENSE](LICENSE).

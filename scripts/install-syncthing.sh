@@ -41,8 +41,17 @@ else
   tar -xzf "$archive" -C "$tmp"
 fi
 
-binary="$(find "$tmp" -type f -name syncthing -o -name syncthing.exe | head -n 1)"
-if [[ -z "$binary" ]]; then
+# The release tarball also ships text helpers named `syncthing` (for example
+# the UFW application profile). Prefer the documented binary path.
+if [[ "$os_name" == "windows" ]]; then
+  binary="$tmp/${asset}/syncthing.exe"
+else
+  binary="$tmp/${asset}/syncthing"
+fi
+if [[ ! -f "$binary" ]]; then
+  binary="$(find "$tmp" -type f \( -name syncthing -o -name syncthing.exe \) ! -path '*/etc/*' | head -n 1)"
+fi
+if [[ -z "${binary:-}" || ! -f "$binary" ]]; then
   echo "extracted archive did not contain syncthing" >&2
   exit 1
 fi

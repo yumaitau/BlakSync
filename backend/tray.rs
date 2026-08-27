@@ -1,7 +1,9 @@
 use std::path::PathBuf;
 use std::process::Stdio;
-use std::sync::{Arc, Mutex};
 use std::time::Duration;
+
+#[cfg(any(windows, target_os = "macos"))]
+use std::sync::{Arc, Mutex};
 
 use tokio::process::{Child, Command};
 use tokio::time::sleep;
@@ -73,10 +75,12 @@ pub async fn run_tray(config_dir: PathBuf, syncthing: Option<String>) -> Result<
 
 async fn wait_for_api(home: &std::path::Path) -> Result<()> {
     for _ in 0..40 {
-        if resolve_api_key(home).is_ok()
-            && let Ok(client) = SyncthingClient::new(None, resolve_api_key(home).ok().as_deref())
-            && client.device_id().await.is_ok()
-        {
+        let key = resolve_api_key(home).ok();
+        let ready = match SyncthingClient::new(None, key.as_deref()) {
+            Ok(client) => client.device_id().await.is_ok(),
+            Err(_) => false,
+        };
+        if ready {
             return Ok(());
         }
         sleep(Duration::from_millis(250)).await;

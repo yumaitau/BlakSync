@@ -1,0 +1,13 @@
+[Unit]
+Description=BlakSync tray wrapper (user)
+Documentation=https://github.com/yumaitau/BlakSync
+After=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/blaksync tray
+Restart=on-failure
+RestartSec=5s
+
+[Install]
+WantedBy=default.target

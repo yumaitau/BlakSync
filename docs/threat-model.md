@@ -87,10 +87,10 @@ Replace `LOST_ID` with the Syncthing Device ID of the lost or untrusted machine.
 
 ### GUI
 
-1. Open the local GUI: `http://127.0.0.1:8384`
-2. Remote Devices → the lost device → **Edit** → **Remove** → confirm
-3. If a "New Device" banner appears for that ID, click **Ignore**
-4. Repeat on every remaining device, including the office node
+1. Open the BlakSync GUI: `http://127.0.0.1:8385`
+2. Remote devices → the lost device → **Revoke device** → confirm. The dialog states leftover files are not wiped remotely.
+3. If the same ID knocks again, deny it under Pending.
+4. Repeat on every remaining device, including the office node. The stock Syncthing GUI at `http://127.0.0.1:8384` remains a fallback.
 
 ### REST (Linux)
 

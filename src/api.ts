@@ -10,11 +10,15 @@ export type FolderRow = {
   label: string
   path: string
   status: string
+  folderType?: string
   outOfSync: number
   sizeBytes: number
   accessNote: string
   sharedWith: SharedDevice[]
   devices: string[]
+  conflicts?: string[]
+  conflictAdvice?: string
+  unshareLeavesFiles?: boolean
 }
 
 export type RemoteDevice = {
@@ -31,6 +35,7 @@ export type PendingDevice = {
   deviceId: string
   name: string
   address: string
+  shortCode?: string
   accessNotes: { folderId: string; note: string }[]
 }
 
@@ -42,6 +47,27 @@ export type ThisDevice = {
   uptimeSeconds: number
   inboundBytes: number
   outboundBytes: number
+  shortCode?: string
+  qrSvg?: string
+  discoveryPreset?: string
+  discoveryLabel?: string
+  sendLimitKib?: number
+  receiveLimitKib?: number
+  syncthingPin?: string
+  blaksyncVersion?: string
+}
+
+export type Capabilities = {
+  actorId: string
+  actorName: string
+  role: 'owner' | 'admin' | 'member' | null
+  accept: boolean
+  share: boolean
+  revoke: boolean
+  assignRoles: boolean
+  exportAudit: boolean
+  writeFolder: boolean
+  editSettings: boolean
 }
 
 export type Overview = {
@@ -54,9 +80,16 @@ export type Overview = {
       folderId: string
       label: string
       accessNote: string
+      offeredBy?: Record<string, { name?: string }>
     }[]
   }
   syncthingUrl: string
+  capabilities?: Capabilities
+  setupNeeded?: boolean
+  discoveryPreset?: string
+  globalPaused?: boolean
+  versionCheck?: boolean
+  tls?: boolean
 }
 
 export type Settings = {
@@ -65,6 +98,50 @@ export type Settings = {
   guiBind: string
   accessNotesPath: string
   stockGuiFallback: string
+  tls?: boolean
+  versionCheck?: boolean
+  startAtLogin?: boolean
+  discoveryPreset?: string
+  discoveryLabel?: string
+  tailscaleListen?: string
+  sendLimitKib?: number
+  receiveLimitKib?: number
+  syncthingPin?: string
+  blaksyncVersion?: string
+  capabilities?: Capabilities
+  organisation?: { name: string; timezone: string; contact: string }
+  roleRule?: string
+  privacyPath?: string
+  support?: string
+}
+
+export type AuditRow = {
+  timestamp: string
+  event: string
+  actor: string
+  role: string
+  device_id: string
+  folder_label: string
+}
+
+export type OfficeHealth = {
+  folders: { id: string; status: string; outOfSyncItems: number; freeDiskBytes: number }[]
+  devices: { deviceId: string; connected: boolean; lastSeen?: string | null }[]
+}
+
+export type UpdateInfo = {
+  enabled: boolean
+  current: string
+  latest?: string | null
+  newer: boolean
+  releaseUrl?: string | null
+}
+
+export type Member = {
+  id: string
+  name: string
+  role: string
+  device_id?: string | null
 }
 
 export async function apiGet<T>(path: string): Promise<T> {

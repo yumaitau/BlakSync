@@ -1,0 +1,19 @@
+<!-- WinSW service for an office PC. No API key on the command line. -->
+<service>
+  <id>blaksync-office</id>
+  <name>BlakSync office node</name>
+  <description>Local-first folder sync. GUI stays on 127.0.0.1.</description>
+  <executable>C:\Program Files\BlakSync\blaksync.exe</executable>
+  <arguments>start --home D:\BlakSync\config</arguments>
+  <workingdirectory>D:\BlakSync</workingdirectory>
+  <log mode="roll-by-size">
+    <sizeThreshold>10240</sizeThreshold>
+    <keepFiles>8</keepFiles>
+  </log>
+  <onfailure action="restart" delay="5 sec"/>
+  <startmode>Automatic</startmode>
+  <serviceaccount>
+    <username>.\blaksync</username>
+    <allowservicelogon>true</allowservicelogon>
+  </serviceaccount>
+</service>

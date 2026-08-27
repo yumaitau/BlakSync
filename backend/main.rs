@@ -510,10 +510,10 @@ async fn run_syncthing(config_dir: &Path, command: Command) -> Result<Output> {
         Command::Health => json!(client.office_health().await?),
         Command::Revoke(args) => {
             client.revoke_device(&args.device).await?;
-            if let Ok(org) = OrgOverlay::new(config_dir)
-                && org.has_org()?
-            {
-                org.revoke_device(None, &args.device)?;
+            if let Ok(org) = OrgOverlay::new(config_dir) {
+                if org.has_org()? {
+                    org.revoke_device(None, &args.device)?;
+                }
             }
             json!({
                 "revoked": true,

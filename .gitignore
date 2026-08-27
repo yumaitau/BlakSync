@@ -11,6 +11,7 @@ lerna-debug.log*
 node_modules
 target
 dist
+dist-release
 dist-ssr
 *.local
 

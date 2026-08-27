@@ -5,7 +5,8 @@ use reqwest::Method;
 use serde::Serialize;
 use serde_json::{Map, Value, json};
 
-use crate::org::require_device_id;
+use crate::app_settings::{DiscoveryPreset, validate_tailscale_listen};
+use crate::org::{looks_like_short_code, require_device_id, short_device_code};
 use crate::{Error, Result};
 
 pub const DEFAULT_ORG_ROOT: &str = "/srv/blaksync";
@@ -24,12 +25,14 @@ pub struct FolderStatus {
     pub label: String,
     pub path: String,
     pub status: String,
+    pub folder_type: String,
     pub devices: Vec<String>,
     pub need_bytes: u64,
     pub need_files: u64,
     pub need_total_items: u64,
     pub out_of_sync: u64,
     pub size_bytes: u64,
+    pub conflicts: Vec<String>,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -82,7 +85,9 @@ pub struct OfficeHealth {
 impl SyncthingClient {
     pub fn new(base_url: Option<&str>, api_key: Option<&str>) -> Result<Self> {
         let api_key = api_key.filter(|value| !value.is_empty()).ok_or_else(|| {
-            Error::Config("Set BLAKSYNC_API_KEY to your local Syncthing API key.".into())
+            Error::Config(
+                "Could not find a Syncthing API key. Run `blaksync start` so config.xml is created, or set BLAKSYNC_API_KEY for tests.".into(),
+            )
         })?;
         Ok(Self {
             base_url: base_url
@@ -203,9 +208,21 @@ impl SyncthingClient {
         path: &str,
         label: Option<&str>,
     ) -> Result<Value> {
+        self.add_folder_typed(folder_id, path, label, "sendreceive")
+            .await
+    }
+
+    pub async fn add_folder_typed(
+        &self,
+        folder_id: &str,
+        path: &str,
+        label: Option<&str>,
+        folder_type: &str,
+    ) -> Result<Value> {
         if folder_id.is_empty() || path.is_empty() {
             return Err(Error::Config("Folder ID and path are required".into()));
         }
+        let folder_type = normalize_folder_type(folder_type)?;
         let mut folder = object(
             self.request(Method::GET, "/rest/config/defaults/folder", None)
                 .await?,
@@ -213,7 +230,7 @@ impl SyncthingClient {
         folder.insert("id".into(), json!(folder_id));
         folder.insert("path".into(), json!(path));
         folder.insert("label".into(), json!(label.unwrap_or(folder_id)));
-        folder.insert("type".into(), json!("sendreceive"));
+        folder.insert("type".into(), json!(folder_type));
         folder.insert("paused".into(), json!(false));
         let value = Value::Object(folder);
         self.request(Method::POST, "/rest/config/folders", Some(value.clone()))
@@ -274,6 +291,172 @@ impl SyncthingClient {
         let path = format!("/rest/config/folders/{}", encode(folder_id));
         self.request(Method::PATCH, &path, Some(json!({ "paused": paused })))
             .await?;
+        Ok(())
+    }
+
+    pub async fn set_folder_type(&self, folder_id: &str, folder_type: &str) -> Result<()> {
+        let folder_type = normalize_folder_type(folder_type)?;
+        let path = format!("/rest/config/folders/{}", encode(folder_id));
+        self.request(Method::PATCH, &path, Some(json!({ "type": folder_type })))
+            .await?;
+        Ok(())
+    }
+
+    pub async fn folder_ignores(&self, folder_id: &str) -> Result<Vec<String>> {
+        let path = format!("/rest/db/ignores?folder={}", encode(folder_id));
+        let value = self.request(Method::GET, &path, None).await?;
+        Ok(value
+            .get("ignore")
+            .and_then(Value::as_array)
+            .into_iter()
+            .flatten()
+            .filter_map(Value::as_str)
+            .map(str::to_string)
+            .collect())
+    }
+
+    pub async fn set_folder_ignores(
+        &self,
+        folder_id: &str,
+        ignore: &[String],
+    ) -> Result<Vec<String>> {
+        let path = format!("/rest/db/ignores?folder={}", encode(folder_id));
+        self.request(Method::POST, &path, Some(json!({ "ignore": ignore })))
+            .await?;
+        self.folder_ignores(folder_id).await
+    }
+
+    pub async fn remove_folder(&self, folder_id: &str) -> Result<()> {
+        let path = format!("/rest/config/folders/{}", encode(folder_id));
+        self.request(Method::DELETE, &path, None).await?;
+        Ok(())
+    }
+
+    pub async fn remove_device(&self, device_id: &str) -> Result<()> {
+        let device_id = require_device_id(device_id)?;
+        let path = format!("/rest/config/devices/{}", encode(&device_id));
+        self.request(Method::DELETE, &path, None).await?;
+        let _ = self.deny_pending_device(&device_id).await;
+        Ok(())
+    }
+
+    pub async fn set_this_device_name(&self, name: &str) -> Result<()> {
+        let name = name.trim();
+        if name.is_empty() {
+            return Err(Error::Config("Device name is required.".into()));
+        }
+        let own_id = self.device_id().await?;
+        let path = format!("/rest/config/devices/{}", encode(&own_id));
+        self.request(Method::PATCH, &path, Some(json!({ "name": name })))
+            .await?;
+        Ok(())
+    }
+
+    pub async fn options(&self) -> Result<Value> {
+        self.request(Method::GET, "/rest/config/options", None)
+            .await
+    }
+
+    pub async fn patch_options(&self, patch: Value) -> Result<Value> {
+        self.request(Method::PATCH, "/rest/config/options", Some(patch))
+            .await?;
+        self.options().await
+    }
+
+    pub async fn apply_discovery(
+        &self,
+        preset: DiscoveryPreset,
+        tailscale_listen: Option<&str>,
+    ) -> Result<Value> {
+        let patch = match preset {
+            DiscoveryPreset::Lan => json!({
+                "globalAnnounceEnabled": false,
+                "relaysEnabled": false,
+                "localAnnounceEnabled": true,
+                "natEnabled": false,
+                "listenAddresses": ["default"],
+            }),
+            DiscoveryPreset::Global => json!({
+                "globalAnnounceEnabled": true,
+                "relaysEnabled": true,
+                "localAnnounceEnabled": true,
+                "natEnabled": true,
+                "listenAddresses": ["default"],
+            }),
+            DiscoveryPreset::Tailscale => {
+                let listen = validate_tailscale_listen(tailscale_listen.unwrap_or_default())?;
+                json!({
+                    "globalAnnounceEnabled": false,
+                    "relaysEnabled": false,
+                    "localAnnounceEnabled": false,
+                    "natEnabled": false,
+                    "listenAddresses": [listen],
+                })
+            }
+        };
+        self.patch_options(patch).await
+    }
+
+    pub async fn apply_bandwidth(&self, send_kib: i64, recv_kib: i64) -> Result<Value> {
+        if send_kib < 0 || recv_kib < 0 {
+            return Err(Error::Config("Bandwidth limits cannot be negative.".into()));
+        }
+        self.patch_options(json!({
+            "maxSendKbps": send_kib,
+            "maxRecvKbps": recv_kib,
+        }))
+        .await
+    }
+
+    pub async fn pause_all_folders(&self, paused: bool) -> Result<()> {
+        let folders = self.folders().await?;
+        for folder in folders {
+            let id = value_string(&folder, "id");
+            if !id.is_empty() {
+                self.set_folder_paused(&id, paused).await?;
+            }
+        }
+        Ok(())
+    }
+
+    pub async fn resolve_device_id(&self, input: &str) -> Result<String> {
+        let input = input.trim();
+        if looks_like_short_code(input) {
+            let needle = input.to_ascii_uppercase();
+            let pending = self.pending_devices().await?;
+            let matches: Vec<String> = pending
+                .as_object()
+                .into_iter()
+                .flatten()
+                .map(|(device_id, _)| device_id.clone())
+                .filter(|device_id| short_device_code(device_id) == needle)
+                .collect();
+            return match matches.as_slice() {
+                [device_id] => Ok(device_id.clone()),
+                [] => Err(Error::NotFound(
+                    "No pending device on the LAN matches that short code.".into(),
+                )),
+                _ => Err(Error::Config(
+                    "More than one pending device matches that short code. Use the full device ID."
+                        .into(),
+                )),
+            };
+        }
+        require_device_id(input)
+    }
+
+    pub async fn revoke_device(&self, device_id: &str) -> Result<()> {
+        let device_id = require_device_id(device_id)?;
+        let own_id = self.device_id().await?;
+        for folder in self.folders().await? {
+            let id = value_string(&folder, "id");
+            if !id.is_empty() {
+                self.unshare_folder(&id, &device_id).await?;
+            }
+        }
+        if device_id != own_id {
+            self.remove_device(&device_id).await?;
+        }
         Ok(())
     }
 
@@ -508,11 +691,13 @@ fn folder_status(
 ) -> FolderStatus {
     let runtime = runtime.unwrap_or(&Value::Null);
     let id = value_string(folder, "id");
+    let path = value_string(folder, "path");
     FolderStatus {
         label: nonempty_or(value_string(folder, "label"), &id),
         id,
-        path: value_string(folder, "path"),
+        path: path.clone(),
         status: status.into(),
+        folder_type: nonempty_or(value_string(folder, "type"), "sendreceive"),
         devices,
         need_bytes: u64_field(runtime, "needBytes"),
         need_files: u64_field(runtime, "needFiles"),
@@ -527,6 +712,74 @@ fn folder_status(
         } else {
             u64_field(runtime, "localBytes")
         },
+        conflicts: conflict_paths(Path::new(&path)),
+    }
+}
+
+pub fn conflict_paths(folder_path: &Path) -> Vec<String> {
+    if !folder_path.is_dir() {
+        return Vec::new();
+    }
+    walkdir::WalkDir::new(folder_path)
+        .follow_links(false)
+        .into_iter()
+        .flatten()
+        .filter(|entry| {
+            entry.file_type().is_file()
+                && entry
+                    .file_name()
+                    .to_string_lossy()
+                    .contains(".sync-conflict-")
+        })
+        .filter_map(|entry| {
+            entry
+                .path()
+                .strip_prefix(folder_path)
+                .ok()
+                .map(|path| path.display().to_string())
+        })
+        .take(40)
+        .collect()
+}
+
+pub fn device_qr_svg(device_id: &str) -> Result<String> {
+    let code = qrcode::QrCode::new(device_id.as_bytes())
+        .map_err(|error| Error::Config(format!("Could not build a pairing QR: {error}")))?;
+    Ok(code
+        .render::<qrcode::render::svg::Color>()
+        .min_dimensions(160, 160)
+        .dark_color(qrcode::render::svg::Color("#3d3328"))
+        .light_color(qrcode::render::svg::Color("#f7f1e6"))
+        .build())
+}
+
+pub fn infer_discovery_preset(options: &Value) -> DiscoveryPreset {
+    let global = bool_field(options, "globalAnnounceEnabled");
+    let relays = bool_field(options, "relaysEnabled");
+    let listen = options
+        .get("listenAddresses")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter_map(Value::as_str)
+        .collect::<Vec<_>>()
+        .join(" ");
+    if !global && !relays && listen.contains("100.") {
+        DiscoveryPreset::Tailscale
+    } else if !global && !relays {
+        DiscoveryPreset::Lan
+    } else {
+        DiscoveryPreset::Global
+    }
+}
+
+fn normalize_folder_type(value: &str) -> Result<&'static str> {
+    match value.trim().to_ascii_lowercase().as_str() {
+        "sendreceive" | "send-receive" | "send_receive" => Ok("sendreceive"),
+        "receiveonly" | "receive-only" | "receive_only" => Ok("receiveonly"),
+        _ => Err(Error::Config(
+            "Folder type must be sendreceive or receiveonly.".into(),
+        )),
     }
 }
 
@@ -664,8 +917,16 @@ mod tests {
     #[test]
     fn requires_api_key_without_echoing_it() {
         let error = SyncthingClient::new(None, None).unwrap_err().to_string();
-        assert!(error.contains("BLAKSYNC_API_KEY"));
+        assert!(error.contains("API key"));
         assert!(!error.contains("secret"));
+        assert!(device_qr_svg(PEER).unwrap().contains("<svg"));
+        assert_eq!(
+            infer_discovery_preset(&json!({
+                "globalAnnounceEnabled": false,
+                "relaysEnabled": false
+            })),
+            crate::app_settings::DiscoveryPreset::Lan
+        );
     }
 
     #[tokio::test]

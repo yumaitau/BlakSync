@@ -16,12 +16,11 @@ systemctl daemon-reload
 systemctl enable --now blaksync-office.service
 ```
 
-The unit binds the management GUI to localhost, runs as the dedicated `blaksync` user, restarts after failures, and is enabled for reboot. Open `http://127.0.0.1:8384` through a local browser or SSH tunnel, set a GUI password and API key, then name the Syncthing device **Office node**. Never put the API key on a command line or in a world-readable file.
+The unit binds the management GUI to localhost, runs as the dedicated `blaksync` user, restarts after failures, and is enabled for reboot. BlakSync reads the GUI API key from `config.xml` after `start`. Never put an API key on a command line or in a world-readable file. Open `http://127.0.0.1:8385` for the BlakSync GUI or `http://127.0.0.1:8384` for the stock Syncthing fallback, then name this device **Office node**.
 
 From this repository, add each accepted folder to the standard disk layout:
 
 ```sh
-export BLAKSYNC_API_KEY='local-api-key'
 /usr/local/bin/blaksync office-folder --folder shared-work --label 'Shared work'
 /usr/local/bin/blaksync share --folder shared-work --device LAPTOP_DEVICE_ID
 /usr/local/bin/blaksync health
@@ -31,7 +30,7 @@ export BLAKSYNC_API_KEY='local-api-key'
 
 ## Tailscale-only transport
 
-To keep the sync port off public interfaces, give the office node a stable Tailscale IP and in Syncthing **Settings → Connections**:
+To keep the sync port off public interfaces, give the office node a stable Tailscale IP and apply the **Tailscale only** preset in the BlakSync Settings page, or in Syncthing **Settings → Connections**:
 
 1. Set **Sync Protocol Listen Addresses** to `tcp://TAILSCALE_IP:22000` (and optionally `quic://TAILSCALE_IP:22000`).
 2. Disable Global Discovery, Relaying, and NAT traversal. Local Discovery may remain enabled only if LAN peers are wanted.
@@ -40,15 +39,21 @@ To keep the sync port off public interfaces, give the office node a stable Tails
 
 This is optional. Syncthing still provides authenticated, encrypted transport; Tailscale limits how the node is reachable.
 
-## Windows service note
+## Windows office-node service
 
-Use the official Syncthing Windows package or a service wrapper such as WinSW. Run it under a dedicated local service account with a command equivalent to:
+`deploy/blaksync-office.xml` is a WinSW configuration. Install [WinSW](https://github.com/winsw/winsw), place `blaksync.exe` under `C:\Program Files\BlakSync`, and keep config and folders on org-owned disk such as `D:\BlakSync`.
 
-```text
-syncthing.exe serve --no-browser --no-restart --home=D:\BlakSync\config --gui-address=127.0.0.1:8384
-```
+1. Create a dedicated local account `blaksync` with *Log on as a service*. Do not use a daily-driver login.
+2. Grant that account and org administrators only on `D:\BlakSync` (config `0700` equivalent, no Users write).
+3. `winsw install deploy\blaksync-office.xml` then start the service. Startup type is **Automatic**. Recovery restarts on failure.
+4. The command line is `blaksync start --home D:\BlakSync\config`. The GUI stays on `127.0.0.1`. There is no API key on the command line.
+5. After reboot, `blaksync health` (with `BLAKSYNC_CONFIG_DIR=D:\BlakSync\config` if needed) and the Health page should work. A field laptop can still sync.
 
-Set the service startup type to **Automatic**, recovery to restart on failure, and grant only that account and org administrators access to `D:\BlakSync`. Set `BLAKSYNC_ORG_ROOT=D:\BlakSync` when using the CLI. Do not store the API key in the service command line.
+## Reboot-safe binary update
+
+1. Copy the new `blaksync` over `/usr/local/bin/blaksync` or `C:\Program Files\BlakSync\blaksync.exe`. Do not replace `config.xml`, `cert.pem`, or `key.pem`.
+2. Restart the service: `systemctl restart blaksync-office` or the Windows Services console.
+3. Confirm `blaksync health` and the Health page. Devices reconnect. Folder IDs and free-byte counts are visible; file names are not.
 
 ## Reboot validation
 

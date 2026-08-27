@@ -2,13 +2,15 @@
 
 # BlakSync
 
-[![CI](https://github.com/jusso-dev/BlakSync/actions/workflows/ci.yml/badge.svg)](https://github.com/jusso-dev/BlakSync/actions/workflows/ci.yml)
-[![Secret scan](https://github.com/jusso-dev/BlakSync/actions/workflows/secret-scan.yml/badge.svg)](https://github.com/jusso-dev/BlakSync/actions/workflows/secret-scan.yml)
+[![CI](https://github.com/yumaitau/BlakSync/actions/workflows/ci.yml/badge.svg)](https://github.com/yumaitau/BlakSync/actions/workflows/ci.yml)
+[![Secret scan](https://github.com/yumaitau/BlakSync/actions/workflows/secret-scan.yml/badge.svg)](https://github.com/yumaitau/BlakSync/actions/workflows/secret-scan.yml)
 
 Peer-to-peer folder sync and sharing for Australian Indigenous organisations.
 Devices talk to each other. There is no Dropbox, iCloud, or OneDrive in the middle. Built for Country, not the cloud.
 
-Public repo: https://github.com/jusso-dev/BlakSync
+Public repo: https://github.com/yumaitau/BlakSync
+
+The earlier clone at https://github.com/jusso-dev/BlakSync is archive-only.
 
 ## Interface
 
@@ -54,7 +56,13 @@ Upstream: https://github.com/syncthing/syncthing
 
 ## Install and start Syncthing
 
-Install Rust 1.85 or newer and the official Syncthing package for your platform. Node.js 22 or newer is needed only when building the React GUI. On Linux, install Syncthing from your distribution or the upstream package repository. On macOS, use the official package or Homebrew. On Windows, install the official package and put `syncthing.exe` on `PATH`.
+Install Rust 1.85 or newer. Node.js 22 or newer is needed only when building the React GUI. Syncthing does not have to be on `PATH`. Install the pinned build (currently 2.1.3) into the config `bin` directory or next to `blaksync`:
+
+```sh
+bash scripts/install-syncthing.sh "$HOME/.config/blaksync/bin"
+```
+
+See [docs/syncthing-pin.md](docs/syncthing-pin.md) to bump the pin. `blaksync --version` prints it. `blaksync start` refuses an unsupported major version.
 
 Build the Rust backend and GUI, then start Syncthing under BlakSync's dedicated config directory:
 
@@ -77,16 +85,17 @@ For development, `cargo run -- start` runs the same command without installing t
 
 ## Local web GUI
 
-Build once, then start the BlakSync GUI. It binds to `127.0.0.1:8385` by default and talks to Syncthing through the same API key as the CLI. No third-party analytics. No CDN fonts.
+Build once, then start the BlakSync GUI. It binds to `127.0.0.1:8385` by default and reads the Syncthing API key from `config.xml` after `start`. You do not export `BLAKSYNC_API_KEY` on a field laptop. The environment variable remains for tests. No third-party analytics. No CDN fonts.
 
 ```sh
 npm ci
 npm run build
-export BLAKSYNC_API_KEY='your-local-syncthing-api-key'
 ./target/release/blaksync gui
 ```
 
-Open http://127.0.0.1:8385. Pages cover Folders, This device, Remote devices, Pending, and Settings. From Folders you can add a folder (with an access note), share it with a paired device, pause, or unshare. Pending shows access notes before Accept or Deny.
+`blaksync gui --tls` serves HTTPS with `https-cert.pem` / `https-key.pem` in the config directory. HTTP on that port is then refused. The GUI still refuses a non-localhost bind.
+
+Open http://127.0.0.1:8385. Pages cover Folders, This device, Remote devices, Pending, Health, Audit, Settings, and Privacy. The first run is a wizard: organisation, `Australia/*` timezone, device name, and discovery. From Folders you can add a folder (with an access note), share it, pause, or unshare. Unshare leaves files already received. Pending shows access notes before Accept or Deny. Members cannot accept or share.
 
 For local frontend work without rebuilding:
 
@@ -99,10 +108,9 @@ npm run dev
 
 ## Pair and share from the CLI
 
-Requires the running Syncthing instance started above. BlakSync controls Syncthing through its local REST API; it does not proxy or store files. Create an API key under **Actions → Settings → GUI**, and keep the GUI bound to localhost. The key is read only from the environment and is never printed:
+Requires the running Syncthing instance started above. BlakSync controls Syncthing through its local REST API; it does not proxy or store files. After `start`, commands read `<apikey>` from the dedicated `config.xml`. The key is never printed. `BLAKSYNC_API_KEY` remains as a test override:
 
 ```sh
-export BLAKSYNC_API_KEY='your-local-syncthing-api-key'
 # Optional when the local GUI is not at the default address:
 export BLAKSYNC_URL='http://127.0.0.1:8384'
 ./target/release/blaksync device-id
@@ -150,7 +158,7 @@ Unsharing removes that device from the folder and stops subsequent updates. It d
 
 ## Manual two-device acceptance test
 
-1. Start Syncthing and configure the environment variables above on two machines running BlakSync. Confirm `device-id` returns the same ID shown by Syncthing.
+1. Start Syncthing with `blaksync start` on two machines. Confirm `device-id` returns the same ID shown by Syncthing. No API key export is required after `start`. CI also runs `scripts/e2e-two-device.sh` on the self-hosted runner.
 2. Run `add-device` on both machines. Confirm a third, unaccepted Syncthing device is absent from `devices` and cannot list or request `sync-test`.
 3. Add and share `sync-test` on A. Confirm B reports the offer but receives no files before `accept-folder` is run on B.
 4. On A, create a 100 MiB test file without uploading it anywhere: `dd if=/dev/urandom of=sync-test/payload.bin bs=1M count=100 status=progress`.
@@ -235,7 +243,14 @@ Default config directory: `--config-dir` or `BLAKSYNC_CONFIG_DIR`, otherwise the
 
 Timezone must be an `Australia/*` IANA name. The pending prompt shows the org name, folder labels, who may pair, and the access note before Accept. Members who run `accept` still see the note, then the command fails.
 
-The audit CSV columns are `timestamp,event,actor,role,device_id,folder_label`. Events are `device_accepted`, `folder_shared`, and `folder_unshared`. Paths and file contents are not recorded.
+The audit CSV columns are `timestamp,event,actor,role,device_id,folder_label`. Events include `device_accepted`, `folder_shared`, `folder_unshared`, `device_revoked`, and `role_changed`. Paths and file contents are not recorded. Only an owner can assign roles. An admin cannot create a new owner. The last owner cannot demote themselves.
+
+Backup the office-node config onto org-owned disk or a USB drive, never into this repository:
+
+```sh
+./target/release/blaksync backup --out /media/org-usb/blaksync
+./target/release/blaksync restore --from /media/org-usb/blaksync
+```
 
 ```sh
 cargo test --all-targets --all-features --locked
@@ -243,7 +258,9 @@ cargo test --all-targets --all-features --locked
 
 ## Office node
 
-See [the office node guide](docs/office-node.md) for the org-owned disk layout, reboot-safe systemd service, aggregate health command, Windows service note, and optional Tailscale-only transport.
+See [the office node guide](docs/office-node.md) for the org-owned disk layout, reboot-safe systemd service, Windows WinSW service, health page, and optional Tailscale-only transport.
+
+Printed office copy: [pairing card](docs/pairing-card.md), [office SOP](docs/office-sop.md), and [privacy notice](docs/privacy.md). Release cuts follow [docs/release.md](docs/release.md).
 
 ## Licence
 

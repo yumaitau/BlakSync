@@ -27,4 +27,7 @@ npm ci
 npm run lint
 npm run typecheck
 npm run build
+bash scripts/check-versions.sh
 ```
+
+Releases: [docs/release.md](docs/release.md). Syncthing pin: [docs/syncthing-pin.md](docs/syncthing-pin.md).

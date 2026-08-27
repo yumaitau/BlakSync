@@ -703,3 +703,120 @@ select:focus-visible {
     width: 100%;
   }
 }
+
+.dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: oklch(0.255 0.018 58 / 0.45);
+}
+
+.dialog {
+  width: min(36rem, 100%);
+  max-height: calc(100vh - 2rem);
+  overflow: auto;
+}
+
+.dialog h2 {
+  margin: 0 0 0.75rem;
+}
+
+.dialog-body {
+  display: grid;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.wizard-steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  padding: 0;
+  margin: 0 0 1rem;
+  list-style: none;
+  color: var(--muted);
+  font-weight: 680;
+}
+
+.wizard-steps [aria-current='step'] {
+  color: var(--ink);
+}
+
+.choice {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  font-weight: 650;
+}
+
+.choice input {
+  width: auto;
+  min-height: 1.25rem;
+}
+
+.qr-panel {
+  display: grid;
+  justify-items: start;
+  gap: 0.75rem;
+}
+
+.qr svg {
+  width: min(14rem, 100%);
+  height: auto;
+  background: var(--surface);
+}
+
+.table-wrap {
+  overflow: auto;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th,
+td {
+  padding: 0.65rem 0.5rem;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+
+th {
+  font-size: 0.82rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.ignore-field {
+  display: grid;
+  gap: 0.45rem;
+  margin-top: 0.9rem;
+}
+
+.update-banner {
+  width: min(74rem, 100%);
+  margin: 1rem auto 0;
+}
+
+fieldset {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 0.85rem 1rem;
+}
+
+legend {
+  padding: 0 0.35rem;
+  font-weight: 760;
+}
+
+.status-needs-you,
+.status-conflict {
+  border-color: color-mix(in oklch, var(--danger) 40%, var(--border));
+  background: var(--danger-soft);
+  color: var(--danger);
+}

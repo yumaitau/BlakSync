@@ -175,6 +175,53 @@ pub struct AuditRow {
     pub folder_label: String,
 }
 
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct Capabilities {
+    pub actor_id: String,
+    pub actor_name: String,
+    pub role: Option<Role>,
+    pub accept: bool,
+    pub share: bool,
+    pub revoke: bool,
+    pub assign_roles: bool,
+    pub export_audit: bool,
+    pub write_folder: bool,
+    pub edit_settings: bool,
+}
+
+impl Capabilities {
+    pub fn unrestricted() -> Self {
+        Self {
+            actor_id: String::new(),
+            actor_name: String::new(),
+            role: None,
+            accept: true,
+            share: true,
+            revoke: true,
+            assign_roles: true,
+            export_audit: true,
+            write_folder: true,
+            edit_settings: true,
+        }
+    }
+
+    pub fn from_member(actor: &Member) -> Self {
+        Self {
+            actor_id: actor.id.clone(),
+            actor_name: actor.name.clone(),
+            role: Some(actor.role),
+            accept: allowed(actor.role, Action::AcceptDevice),
+            share: allowed(actor.role, Action::ShareFolder),
+            revoke: allowed(actor.role, Action::RevokeDevice),
+            assign_roles: allowed(actor.role, Action::AssignRole),
+            export_audit: allowed(actor.role, Action::ExportAudit),
+            write_folder: allowed(actor.role, Action::WriteFolder),
+            edit_settings: allowed(actor.role, Action::SetOrgProfile),
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct OrgOverlay {
     store: ConfigStore,
@@ -240,6 +287,100 @@ impl OrgOverlay {
         self.store.with_lock(|| self.require_org())
     }
 
+    pub fn has_org(&self) -> Result<bool> {
+        self.store.with_lock(|| Ok(self.store.exists(ORG_FILE)))
+    }
+
+    pub fn local_actor(&self, actor_id: Option<&str>) -> Result<Option<Member>> {
+        self.store.with_lock(|| {
+            if !self.store.exists(ORG_FILE) {
+                return Ok(None);
+            }
+            Ok(Some(self.actor(actor_id)?))
+        })
+    }
+
+    pub fn capabilities(&self, actor_id: Option<&str>) -> Result<Capabilities> {
+        match self.local_actor(actor_id)? {
+            Some(actor) => Ok(Capabilities::from_member(&actor)),
+            None => Ok(Capabilities::unrestricted()),
+        }
+    }
+
+    pub fn register_device(
+        &self,
+        actor_id: Option<&str>,
+        device_id: &str,
+        name: &str,
+    ) -> Result<()> {
+        if !self.has_org()? {
+            return Ok(());
+        }
+        self.store.with_lock(|| {
+            let actor = self.actor(actor_id)?;
+            let org = self.require_org()?;
+            let device_id = require_device_id(device_id)?;
+            let mut pending = self.read_pending()?;
+            pending
+                .devices
+                .retain(|device| device.device_id != device_id);
+            self.store.write_json(PENDING_FILE, &pending)?;
+            let mut devices = self.read_devices()?;
+            if !devices
+                .devices
+                .iter()
+                .any(|device| device.device_id == device_id)
+            {
+                devices.devices.push(AcceptedDevice {
+                    device_id: device_id.clone(),
+                    name: if name.trim().is_empty() {
+                        device_id.clone()
+                    } else {
+                        name.trim().to_string()
+                    },
+                    accepted_at: timestamp(&org.timezone)?,
+                    accepted_by: actor.id.clone(),
+                });
+                self.store.write_json(DEVICES_FILE, &devices)?;
+            }
+            Ok(())
+        })
+    }
+
+    pub fn revoke_device(&self, actor_id: Option<&str>, device_id: &str) -> Result<Vec<String>> {
+        self.store.with_lock(|| {
+            if !self.store.exists(ORG_FILE) {
+                return Ok(Vec::new());
+            }
+            let actor = self.actor(actor_id)?;
+            require_permission(&actor, Action::RevokeDevice)?;
+            let org = self.require_org()?;
+            let device_id = require_device_id(device_id)?;
+            let mut folders = self.read_folders()?;
+            let mut unshared = Vec::new();
+            for folder in &mut folders.folders {
+                if folder.shared_with.iter().any(|item| item == &device_id) {
+                    folder.shared_with.retain(|item| item != &device_id);
+                    unshared.push(folder.label.clone());
+                    self.audit(&org, "folder_unshared", &actor, &device_id, &folder.label)?;
+                }
+            }
+            self.store.write_json(FOLDERS_FILE, &folders)?;
+            let mut devices = self.read_devices()?;
+            devices
+                .devices
+                .retain(|device| device.device_id != device_id);
+            self.store.write_json(DEVICES_FILE, &devices)?;
+            let mut pending = self.read_pending()?;
+            pending
+                .devices
+                .retain(|device| device.device_id != device_id);
+            self.store.write_json(PENDING_FILE, &pending)?;
+            self.audit(&org, "device_revoked", &actor, &device_id, "")?;
+            Ok(unshared)
+        })
+    }
+
     pub fn set_org(
         &self,
         actor_id: Option<&str>,
@@ -296,6 +437,11 @@ impl OrgOverlay {
             if roles.members.iter().any(|member| member.id == member_id) {
                 return Err(Error::Config(format!("Member already exists: {member_id}")));
             }
+            if actor.role != Role::Owner && role == Role::Owner {
+                return Err(Error::Role(
+                    "Only an owner can create or promote another owner.".into(),
+                ));
+            }
             let member = Member {
                 id: member_id,
                 name: required_text(name, "Member name")?,
@@ -304,6 +450,8 @@ impl OrgOverlay {
             };
             roles.members.push(member.clone());
             self.store.write_json(ROLES_FILE, &roles)?;
+            let org = self.require_org()?;
+            self.audit(&org, "role_changed", &actor, "", &member.name)?;
             Ok(member)
         })
     }
@@ -312,6 +460,11 @@ impl OrgOverlay {
         self.store.with_lock(|| {
             let actor = self.actor(actor_id)?;
             require_permission(&actor, Action::AssignRole)?;
+            if actor.role != Role::Owner && role == Role::Owner {
+                return Err(Error::Role(
+                    "Only an owner can create or promote another owner.".into(),
+                ));
+            }
             let mut roles = self.read_roles()?;
             let owner_count = roles
                 .members
@@ -325,12 +478,14 @@ impl OrgOverlay {
                 .ok_or_else(|| Error::NotFound(format!("Unknown member: {member_id}")))?;
             if member.role == Role::Owner && role != Role::Owner && owner_count == 1 {
                 return Err(Error::Config(
-                    "The organisation must keep at least one owner.".into(),
+                    "The last owner cannot demote themselves. The organisation must keep at least one owner.".into(),
                 ));
             }
             member.role = role;
             let result = member.clone();
             self.store.write_json(ROLES_FILE, &roles)?;
+            let org = self.require_org()?;
+            self.audit(&org, "role_changed", &actor, "", &result.name)?;
             Ok(result)
         })
     }
@@ -590,6 +745,19 @@ impl OrgOverlay {
         })
     }
 
+    pub fn guard(
+        &self,
+        actor_id: Option<&str>,
+        allowed: impl Fn(&Capabilities) -> bool,
+        message: &str,
+    ) -> Result<Capabilities> {
+        let caps = self.capabilities(actor_id)?;
+        if !allowed(&caps) {
+            return Err(Error::Role(message.to_string()));
+        }
+        Ok(caps)
+    }
+
     pub fn list_audit(&self, actor_id: Option<&str>) -> Result<Vec<AuditRow>> {
         self.store.with_lock(|| {
             let actor = self.actor(actor_id)?;
@@ -805,6 +973,23 @@ fn require_simple_id(value: &str, label: &str) -> Result<String> {
     Ok(value)
 }
 
+pub fn short_device_code(device_id: &str) -> String {
+    device_id
+        .chars()
+        .filter(|character| *character != '-')
+        .take(6)
+        .collect::<String>()
+        .to_ascii_uppercase()
+}
+
+pub fn looks_like_short_code(value: &str) -> bool {
+    let value = value.trim();
+    value.len() == 6
+        && value
+            .chars()
+            .all(|character| matches!(character, 'A'..='Z' | 'a'..='z' | '2'..='7'))
+}
+
 pub fn require_device_id(value: &str) -> Result<String> {
     let value = required_text(value, "Device ID")?;
     if !DEVICE_ID.is_match(&value) {
@@ -901,6 +1086,7 @@ enum Action {
     RecordPendingDevice,
     ShareFolder,
     ExportAudit,
+    RevokeDevice,
 }
 
 fn allowed(role: Role, action: Action) -> bool {
@@ -912,7 +1098,8 @@ fn allowed(role: Role, action: Action) -> bool {
         | Action::DenyDevice
         | Action::RecordPendingDevice
         | Action::ShareFolder
-        | Action::ExportAudit => matches!(role, Role::Owner | Role::Admin),
+        | Action::ExportAudit
+        | Action::RevokeDevice => matches!(role, Role::Owner | Role::Admin),
     }
 }
 
@@ -937,6 +1124,7 @@ fn require_permission(actor: &Member, action: Action) -> Result<()> {
             actor.role.as_str()
         ),
         Action::ExportAudit => format!("Role {} cannot export the audit log.", actor.role.as_str()),
+        Action::RevokeDevice => format!("Role {} cannot revoke a device.", actor.role.as_str()),
         Action::DenyDevice | Action::RecordPendingDevice => format!(
             "Role {} cannot manage pending devices.",
             actor.role.as_str()
@@ -1046,10 +1234,18 @@ mod tests {
         first.accept_device(None, PEER).unwrap();
         first.share_folder(None, "heritage", PEER).unwrap();
         first.unshare_folder(None, "heritage", PEER).unwrap();
+        first
+            .add_member(None, "it-admin", "IT admin", Role::Admin, None)
+            .unwrap();
+        first.set_role(None, "it-admin", Role::Member).unwrap();
+        first.revoke_device(None, PEER).unwrap();
         let csv = first.export_audit_csv(None).unwrap();
         assert!(csv.contains("device_accepted"));
+        assert!(csv.contains("role_changed"));
+        assert!(csv.contains("device_revoked"));
         assert!(csv.contains("Heritage scans"));
         assert!(!csv.contains("path"));
+        assert!(first.revoke_device(Some("it-admin"), PEER).is_err());
         assert_eq!(second.list_folders().unwrap()[0].label, "Payroll");
         assert!(
             !second
@@ -1082,5 +1278,23 @@ mod tests {
                 .is_err()
         );
         org.share_folder(None, "restricted", PEER).unwrap();
+    }
+
+    #[test]
+    fn last_owner_cannot_demote_themselves() {
+        let temporary = tempfile::tempdir().unwrap();
+        let org = organisation(temporary.path());
+        assert!(org.set_role(None, "office-node", Role::Member).is_err());
+        assert!(
+            !org.capabilities(Some("field-worker"))
+                .unwrap_or_else(|_| {
+                    org.add_member(None, "field-worker", "Field", Role::Member, None)
+                        .unwrap();
+                    org.capabilities(Some("field-worker")).unwrap()
+                })
+                .assign_roles
+        );
+        assert_eq!(short_device_code(PEER), "AAAAAA");
+        assert!(looks_like_short_code("AAAAAA"));
     }
 }

@@ -123,6 +123,52 @@ impl ConfigStore {
     }
 }
 
+pub fn set_mode(path: &Path, mode: u32) -> Result<()> {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(path, fs::Permissions::from_mode(mode))?;
+    }
+    #[cfg(not(unix))]
+    let _ = (path, mode);
+    Ok(())
+}
+
+pub fn extract_apikey(xml: &str) -> Result<String> {
+    let start = xml
+        .find("<apikey>")
+        .ok_or_else(|| Error::Config("config.xml does not contain a GUI API key yet.".into()))?;
+    let rest = &xml[start + "<apikey>".len()..];
+    let end = rest
+        .find("</apikey>")
+        .ok_or_else(|| Error::Config("config.xml has a broken <apikey> tag.".into()))?;
+    let key = rest[..end].trim();
+    if key.is_empty() {
+        return Err(Error::Config("config.xml has an empty <apikey>.".into()));
+    }
+    Ok(key.to_string())
+}
+
+pub fn read_syncthing_api_key(home: &Path) -> Result<String> {
+    let path = home.join("config.xml");
+    let text = fs::read_to_string(&path).map_err(|_| {
+        Error::Config(
+            "Syncthing has not written config.xml yet. Run `blaksync start` first.".into(),
+        )
+    })?;
+    extract_apikey(&text)
+}
+
+/// Environment override for tests; otherwise the key in `config.xml`.
+pub fn resolve_api_key(home: &Path) -> Result<String> {
+    if let Ok(key) = env::var("BLAKSYNC_API_KEY") {
+        if !key.trim().is_empty() {
+            return Ok(key);
+        }
+    }
+    read_syncthing_api_key(home)
+}
+
 pub fn default_config_dir() -> PathBuf {
     if let Some(value) = env::var_os("BLAKSYNC_CONFIG_DIR") {
         return PathBuf::from(value);
@@ -162,13 +208,16 @@ fn secure_file(path: &Path) -> Result<File> {
     Ok(options.open(path)?)
 }
 
-fn set_mode(path: &Path, mode: u32) -> Result<()> {
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        fs::set_permissions(path, fs::Permissions::from_mode(mode))?;
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn reads_apikey_without_echoing_it_in_errors() {
+        let key = extract_apikey("<gui><apikey>local-test-key</apikey></gui>").unwrap();
+        assert_eq!(key, "local-test-key");
+        let error = extract_apikey("<gui></gui>").unwrap_err().to_string();
+        assert!(error.contains("API key"));
+        assert!(!error.contains("local-test-key"));
     }
-    #[cfg(not(unix))]
-    let _ = (path, mode);
-    Ok(())
 }

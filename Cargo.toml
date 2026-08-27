@@ -20,6 +20,7 @@ path = "backend/secret_scan_main.rs"
 
 [dependencies]
 axum = "0.8.9"
+axum-server = { version = "0.7", features = ["tls-rustls"] }
 chrono = { version = "0.4", features = ["serde"] }
 chrono-tz = "0.10.4"
 clap = { version = "4.6.6", features = ["derive"] }
@@ -27,6 +28,8 @@ csv = "1"
 dirs = "6"
 fs2 = "0.4.3"
 percent-encoding = "2"
+qrcode = "0.14"
+rcgen = "0.13"
 regex = "1"
 reqwest = { version = "0.13.4", default-features = false, features = ["json", "rustls"] }
 serde = { version = "1", features = ["derive"] }
@@ -36,6 +39,10 @@ tokio = { version = "1.53.1", features = ["fs", "io-util", "macros", "net", "pro
 tower-http = { version = "0.7.0", features = ["fs"] }
 tempfile = "3"
 walkdir = "2"
+
+[target.'cfg(any(windows, target_os = "macos"))'.dependencies]
+tao = "0.34"
+tray-icon = "0.21"
 
 [dev-dependencies]
 tower = { version = "0.5", features = ["util"] }

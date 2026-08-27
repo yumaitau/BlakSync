@@ -46,6 +46,7 @@ pub fn findings_in(path: &str, content: &str) -> Vec<Finding> {
     let mut findings = Vec::new();
     let normalised = path.replace('\\', "/");
     let file_name = normalised.rsplit('/').next().unwrap_or(&normalised);
+    let is_config_xml = file_name.eq_ignore_ascii_case("config.xml");
 
     if let Some(found) = PEM_PRIVATE.find(content) {
         findings.push(Finding {
@@ -73,13 +74,15 @@ pub fn findings_in(path: &str, content: &str) -> Vec<Finding> {
             snippet: normalised,
         });
     }
-    for captures in API_KEY.captures_iter(content) {
-        let value = captures.get(1).map_or("", |item| item.as_str());
-        if !API_KEY_PLACEHOLDER.is_match(value) {
-            findings.push(Finding {
-                rule: "syncthing-gui-apikey".into(),
-                snippet: "<apikey>…[redacted]…</apikey>".into(),
-            });
+    if is_config_xml {
+        for captures in API_KEY.captures_iter(content) {
+            let value = captures.get(1).map_or("", |item| item.as_str());
+            if !API_KEY_PLACEHOLDER.is_match(value) {
+                findings.push(Finding {
+                    rule: "syncthing-gui-apikey".into(),
+                    snippet: "<apikey>…[redacted]…</apikey>".into(),
+                });
+            }
         }
     }
     findings
@@ -332,5 +335,12 @@ mod tests {
     fn allows_documentation_and_placeholders() {
         assert!(findings_in("README.md", "Never commit key.pem").is_empty());
         assert!(findings_in("config.xml", "<apikey>REDACTED</apikey>").is_empty());
+        assert!(
+            findings_in(
+                "backend/config.rs",
+                r#"extract_apikey("<gui><apikey>local-test-key-12345678901</apikey></gui>")"#
+            )
+            .is_empty()
+        );
     }
 }

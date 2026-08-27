@@ -1,12 +1,13 @@
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
-use blaksync::config::default_config_dir;
+use blaksync::config::{default_config_dir, resolve_api_key};
 use blaksync::launcher::launch_syncthing;
 use blaksync::notes::AccessNotesStore;
 use blaksync::org::{OrgOverlay, Role};
 use blaksync::server::{self, ServerOptions};
 use blaksync::syncthing::SyncthingClient;
+use blaksync::version::LONG_VERSION;
 use blaksync::{Error, Result};
 use clap::{Args, Parser, Subcommand};
 use serde_json::{Value, json};
@@ -14,7 +15,7 @@ use serde_json::{Value, json};
 #[derive(Debug, Parser)]
 #[command(
     name = "blaksync",
-    version,
+    version = LONG_VERSION,
     about = "Local-first folder sync for Australian Indigenous organisations",
     long_about = "BlakSync combines a Rust control plane with Syncthing's proven peer-to-peer sync engine. Device trust and folder sharing remain explicit. Each organisation controls its own access notes. There is no social login, and government ID is not stored."
 )]
@@ -68,6 +69,16 @@ enum Command {
     Status,
     /// Show office-oriented folder and device health.
     Health,
+    /// Copy the office-node config onto org-owned disk.
+    Backup(BackupArgs),
+    /// Restore a config backup onto this machine.
+    Restore(RestoreArgs),
+    /// Start BlakSync at login, or stop that.
+    Autostart(AutostartArgs),
+    /// Unshare every folder and remove a lost device.
+    Revoke(DeviceArgs),
+    /// Run Syncthing and the GUI from a tray or user service.
+    Tray,
     /// Manage the organisation profile, roles, access notes, and audit log.
     Org(OrgArgs),
 }
@@ -88,6 +99,34 @@ struct GuiArgs {
     port: Option<u16>,
     #[arg(long, value_name = "DIR")]
     static_root: Option<PathBuf>,
+    /// Serve HTTPS with a local certificate in the config directory.
+    #[arg(long)]
+    tls: bool,
+}
+
+#[derive(Debug, Args)]
+struct BackupArgs {
+    #[arg(long, value_name = "DIR")]
+    out: PathBuf,
+}
+
+#[derive(Debug, Args)]
+struct RestoreArgs {
+    #[arg(long, value_name = "DIR")]
+    from: PathBuf,
+}
+
+#[derive(Debug, Args)]
+struct AutostartArgs {
+    #[command(subcommand)]
+    command: AutostartCommand,
+}
+
+#[derive(Debug, Subcommand)]
+enum AutostartCommand {
+    Enable,
+    Disable,
+    Status,
 }
 
 #[derive(Debug, Args)]
@@ -370,10 +409,44 @@ async fn run(cli: Cli) -> CliResult<Output> {
             Ok(Output::None)
         }
         Command::Gui(args) => {
-            let mut options =
-                ServerOptions::from_environment(args.host, args.port, args.static_root)?;
-            options.config_dir = config_dir;
+            let options = ServerOptions::from_environment(
+                args.host,
+                args.port,
+                args.static_root,
+                config_dir,
+                args.tls,
+            )?;
             server::serve(options).await?;
+            Ok(Output::None)
+        }
+        Command::Backup(args) => {
+            let path = blaksync::backup::backup(Some(&config_dir), &args.out)?;
+            Ok(Output::Json(json!({
+                "path": path,
+                "notice": "Keep this backup on org-owned disk or a USB drive. Do not copy it into git."
+            })))
+        }
+        Command::Restore(args) => {
+            let path = blaksync::backup::restore(Some(&config_dir), &args.from)?;
+            Ok(Output::Json(json!({ "path": path })))
+        }
+        Command::Autostart(args) => match args.command {
+            AutostartCommand::Enable => {
+                let path = blaksync::autostart::enable()?;
+                Ok(Output::Json(json!({ "enabled": true, "path": path })))
+            }
+            AutostartCommand::Disable => {
+                let removed = blaksync::autostart::disable()?;
+                Ok(Output::Json(
+                    json!({ "enabled": false, "removed": removed }),
+                ))
+            }
+            AutostartCommand::Status => Ok(Output::Json(json!({
+                "enabled": blaksync::autostart::status()?
+            }))),
+        },
+        Command::Tray => {
+            blaksync::tray::run_tray(config_dir, None).await?;
             Ok(Output::None)
         }
         Command::Org(args) => run_org(&config_dir, actor, args.command),
@@ -382,7 +455,7 @@ async fn run(cli: Cli) -> CliResult<Output> {
 }
 
 async fn run_syncthing(config_dir: &Path, command: Command) -> Result<Output> {
-    let client = syncthing_client()?;
+    let client = syncthing_client(config_dir)?;
     let value = match command {
         Command::DeviceId => json!({ "deviceId": client.device_id().await? }),
         Command::PendingDevices => client.pending_devices().await?,
@@ -435,7 +508,25 @@ async fn run_syncthing(config_dir: &Path, command: Command) -> Result<Output> {
         }
         Command::Status => json!(client.folder_statuses().await?),
         Command::Health => json!(client.office_health().await?),
-        Command::Start(_) | Command::Gui(_) | Command::Org(_) => {
+        Command::Revoke(args) => {
+            client.revoke_device(&args.device).await?;
+            if let Ok(org) = OrgOverlay::new(config_dir) {
+                if org.has_org()? {
+                    org.revoke_device(None, &args.device)?;
+                }
+            }
+            json!({
+                "revoked": true,
+                "notice": "The device is removed from every folder on this machine. Files already on the lost disk stay there. This is not a remote wipe."
+            })
+        }
+        Command::Start(_)
+        | Command::Gui(_)
+        | Command::Org(_)
+        | Command::Backup(_)
+        | Command::Restore(_)
+        | Command::Autostart(_)
+        | Command::Tray => {
             return Err(Error::Config("Unsupported command routing".into()));
         }
     };
@@ -546,10 +637,10 @@ fn run_org(config_dir: &Path, actor: Option<&str>, command: OrgCommand) -> CliRe
     Ok(Output::Org(kind, output))
 }
 
-fn syncthing_client() -> Result<SyncthingClient> {
+fn syncthing_client(config_dir: &Path) -> Result<SyncthingClient> {
     let url = std::env::var("BLAKSYNC_URL").ok();
-    let key = std::env::var("BLAKSYNC_API_KEY").ok();
-    SyncthingClient::new(url.as_deref(), key.as_deref())
+    let key = resolve_api_key(config_dir)?;
+    SyncthingClient::new(url.as_deref(), Some(&key))
 }
 
 fn parse_roles(value: Option<&str>) -> Result<Option<Vec<Role>>> {
@@ -769,6 +860,12 @@ mod tests {
         assert!(help.contains("access notes"));
         assert!(help.contains("government id is not stored"));
         assert!(help.contains("no social login"));
+        assert!(
+            Cli::command()
+                .get_version()
+                .unwrap_or_default()
+                .contains("2.1.3")
+        );
     }
 
     #[test]

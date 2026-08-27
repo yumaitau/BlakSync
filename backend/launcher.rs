@@ -1,10 +1,12 @@
+use std::env;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
 
-use tokio::process::Command;
+use tokio::process::{Child, Command};
 
 use crate::config::default_config_dir;
 use crate::org::require_device_id;
+use crate::version::{self, PINNED_SYNCTHING, SyncthingVersion};
 use crate::{Error, Result};
 
 const GUI_ADDRESS: &str = "127.0.0.1:8384";
@@ -18,40 +20,121 @@ pub struct LaunchResult {
 }
 
 pub async fn launch_syncthing(binary: Option<&str>, home: Option<&Path>) -> Result<LaunchResult> {
-    let binary = binary
-        .filter(|value| !value.is_empty())
-        .unwrap_or("syncthing");
-    let default_home = default_config_dir();
-    let home = absolute(home.unwrap_or(&default_home))?;
-    tokio::fs::create_dir_all(&home).await?;
-    set_private_directory(&home)?;
-
-    if !home.join("config.xml").is_file() {
-        run_output(binary, &generate_args(&home)).await?;
-    }
-    let device_id = run_output(binary, &device_id_args(&home)).await?;
-    let device_id = require_device_id(device_id.trim())?;
-
+    let prepared = prepare_syncthing(binary, home).await?;
     println!("Syncthing GUI: http://{GUI_ADDRESS}");
-    println!("Device ID: {device_id}");
-    println!("BlakSync config: {}", home.display());
+    println!("Device ID: {}", prepared.device_id);
+    println!("BlakSync config: {}", prepared.home.display());
+    println!("Syncthing pin: {PINNED_SYNCTHING}");
 
-    let status = Command::new(binary)
-        .args(serve_args(&home))
+    let status = Command::new(&prepared.binary)
+        .args(serve_args(&prepared.home))
         .env("STVERSIONEXTRA", "BlakSync")
         .stdin(Stdio::inherit())
         .stdout(Stdio::inherit())
         .stderr(Stdio::inherit())
         .status()
         .await
-        .map_err(|error| executable_error(binary, error))?;
+        .map_err(|error| executable_error(&prepared.binary, error))?;
 
     Ok(LaunchResult {
-        device_id,
+        device_id: prepared.device_id,
         gui_url: format!("http://{GUI_ADDRESS}"),
-        home,
+        home: prepared.home,
         exit_code: status.code().unwrap_or(1),
     })
+}
+
+pub struct PreparedLaunch {
+    pub binary: String,
+    pub home: PathBuf,
+    pub device_id: String,
+}
+
+pub async fn prepare_syncthing(
+    binary: Option<&str>,
+    home: Option<&Path>,
+) -> Result<PreparedLaunch> {
+    let default_home = default_config_dir();
+    let home = absolute(home.unwrap_or(&default_home))?;
+    tokio::fs::create_dir_all(&home).await?;
+    set_private_directory(&home)?;
+    let binary = resolve_syncthing_binary(binary, &home)?;
+    ensure_syncthing_version(&binary).await?;
+
+    if !home.join("config.xml").is_file() {
+        run_output(&binary, &generate_args(&home)).await?;
+    }
+    let device_id = run_output(&binary, &device_id_args(&home)).await?;
+    let device_id = require_device_id(device_id.trim())?;
+    Ok(PreparedLaunch {
+        binary,
+        home,
+        device_id,
+    })
+}
+
+pub async fn spawn_syncthing(
+    binary: Option<&str>,
+    home: Option<&Path>,
+) -> Result<(Child, PreparedLaunch)> {
+    let prepared = prepare_syncthing(binary, home).await?;
+    let child = Command::new(&prepared.binary)
+        .args(serve_args(&prepared.home))
+        .env("STVERSIONEXTRA", "BlakSync")
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .kill_on_drop(true)
+        .spawn()
+        .map_err(|error| executable_error(&prepared.binary, error))?;
+    Ok((child, prepared))
+}
+
+pub fn resolve_syncthing_binary(explicit: Option<&str>, home: &Path) -> Result<String> {
+    if let Some(path) = explicit.filter(|value| !value.is_empty()) {
+        return Ok(path.to_string());
+    }
+    if let Ok(path) = env::var("BLAKSYNC_SYNCTHING") {
+        if !path.trim().is_empty() {
+            return Ok(path);
+        }
+    }
+    let bundled_home = home.join("bin").join(syncthing_filename());
+    if bundled_home.is_file() {
+        return Ok(bundled_home.display().to_string());
+    }
+    if let Some(path) = next_to_executable() {
+        return Ok(path);
+    }
+    Ok(syncthing_filename().into())
+}
+
+fn next_to_executable() -> Option<String> {
+    let exe = env::current_exe().ok()?;
+    let dir = exe.parent()?;
+    for candidate in [
+        dir.join(syncthing_filename()),
+        dir.join("syncthing").join(syncthing_filename()),
+    ] {
+        if candidate.is_file() {
+            return Some(candidate.display().to_string());
+        }
+    }
+    None
+}
+
+fn syncthing_filename() -> &'static str {
+    if cfg!(windows) {
+        "syncthing.exe"
+    } else {
+        "syncthing"
+    }
+}
+
+async fn ensure_syncthing_version(binary: &str) -> Result<()> {
+    let output = run_output(binary, &["--version".into()]).await?;
+    let version = SyncthingVersion::parse(&output)?;
+    version::ensure_supported(version)
 }
 
 fn generate_args(home: &Path) -> Vec<String> {
@@ -105,7 +188,7 @@ async fn run_output(binary: &str, args: &[String]) -> Result<String> {
 fn executable_error(binary: &str, error: std::io::Error) -> Error {
     if error.kind() == std::io::ErrorKind::NotFound {
         return Error::Process(format!(
-            "Syncthing executable not found: {binary}. Install Syncthing or pass --syncthing PATH."
+            "Syncthing executable not found: {binary}. Install the pinned {PINNED_SYNCTHING} build with scripts/install-syncthing.sh, or pass --syncthing PATH."
         ));
     }
     Error::Io(error)
@@ -149,5 +232,12 @@ mod tests {
                 "--no-port-probing",
             ]
         );
+        let missing = executable_error(
+            "missing-syncthing",
+            std::io::Error::new(std::io::ErrorKind::NotFound, "missing"),
+        );
+        let text = missing.to_string();
+        assert!(text.contains(PINNED_SYNCTHING));
+        assert!(text.contains("install-syncthing.sh"));
     }
 }

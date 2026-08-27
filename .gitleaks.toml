@@ -12,6 +12,7 @@ useDefault = true
 [[rules]]
 id = "syncthing-gui-apikey"
 description = "Syncthing/BlakSync GUI API key in config.xml — never commit live config"
+path = '''(?i)(?:^|/)config\.xml$'''
 regex = '''(?i)<apikey>\s*([A-Za-z0-9_-]{22,64})\s*</apikey>'''
 entropy = 3.5
 keywords = ["apikey"]

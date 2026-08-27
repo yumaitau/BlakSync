@@ -121,6 +121,7 @@ async fn current_state(config_dir: &std::path::Path) -> TrayState {
     classify_state(pending, paused, syncing)
 }
 
+#[cfg(any(windows, target_os = "macos"))]
 fn open_gui() {
     let url = "http://127.0.0.1:8385";
     let _ = if cfg!(target_os = "macos") {

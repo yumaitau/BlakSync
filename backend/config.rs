@@ -214,8 +214,8 @@ mod tests {
 
     #[test]
     fn reads_apikey_without_echoing_it_in_errors() {
-        let key = extract_apikey("<gui><apikey>local-test-key-12345678901</apikey></gui>").unwrap();
-        assert_eq!(key, "local-test-key-12345678901");
+        let key = extract_apikey("<gui><apikey>local-test-key</apikey></gui>").unwrap();
+        assert_eq!(key, "local-test-key");
         let error = extract_apikey("<gui></gui>").unwrap_err().to_string();
         assert!(error.contains("API key"));
         assert!(!error.contains("local-test-key"));

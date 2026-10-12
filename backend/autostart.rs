@@ -3,13 +3,30 @@ use std::path::PathBuf;
 #[cfg(not(windows))]
 use std::process::Command;
 
+#[cfg(not(windows))]
 use crate::config::set_mode;
 use crate::{Error, Result};
 
+/// Windows starts BlakSync at login from the per-user Run key. Unlike a
+/// Startup-folder `.cmd`, that launches `blaksync.exe` directly, so no
+/// `cmd.exe` window is left behind and the tray closes its own console.
+#[cfg(windows)]
+const RUN_KEY: &str = r"Software\Microsoft\Windows\CurrentVersion\Run";
+#[cfg(windows)]
+const RUN_VALUE: &str = "BlakSync";
+
+#[cfg(not(windows))]
 pub fn status() -> Result<bool> {
     Ok(unit_path()?.is_file())
 }
 
+#[cfg(windows)]
+pub fn status() -> Result<bool> {
+    Ok(crate::win::hkcu_string_get(RUN_KEY, RUN_VALUE)?.is_some()
+        || legacy_startup_cmd()?.is_file())
+}
+
+#[cfg(not(windows))]
 pub fn enable() -> Result<PathBuf> {
     let path = unit_path()?;
     if let Some(parent) = path.parent() {
@@ -22,6 +39,16 @@ pub fn enable() -> Result<PathBuf> {
     Ok(path)
 }
 
+#[cfg(windows)]
+pub fn enable() -> Result<PathBuf> {
+    crate::win::hkcu_string_set(RUN_KEY, RUN_VALUE, &unit_contents()?)?;
+    remove_legacy_startup_cmd()?;
+    Ok(PathBuf::from(format!(
+        r"HKEY_CURRENT_USER\{RUN_KEY}\{RUN_VALUE}"
+    )))
+}
+
+#[cfg(not(windows))]
 pub fn disable() -> Result<bool> {
     let path = unit_path()?;
     deactivate(&path)?;
@@ -32,6 +59,32 @@ pub fn disable() -> Result<bool> {
     Ok(false)
 }
 
+#[cfg(windows)]
+pub fn disable() -> Result<bool> {
+    let removed = crate::win::hkcu_value_delete(RUN_KEY, RUN_VALUE)?;
+    Ok(remove_legacy_startup_cmd()? || removed)
+}
+
+/// Earlier builds wrote `BlakSync.cmd` to the Startup folder.
+#[cfg(windows)]
+fn legacy_startup_cmd() -> Result<PathBuf> {
+    let startup = dirs::data_dir()
+        .ok_or_else(|| Error::Config("Could not resolve the Windows startup folder.".into()))?
+        .join("Microsoft/Windows/Start Menu/Programs/Startup");
+    Ok(startup.join("BlakSync.cmd"))
+}
+
+#[cfg(windows)]
+fn remove_legacy_startup_cmd() -> Result<bool> {
+    let path = legacy_startup_cmd()?;
+    if path.is_file() {
+        fs::remove_file(&path)?;
+        return Ok(true);
+    }
+    Ok(false)
+}
+
+#[cfg(not(windows))]
 pub fn unit_path() -> Result<PathBuf> {
     #[cfg(target_os = "macos")]
     {
@@ -39,14 +92,7 @@ pub fn unit_path() -> Result<PathBuf> {
             dirs::home_dir().ok_or_else(|| Error::Config("Could not resolve home.".into()))?;
         Ok(home.join("Library/LaunchAgents/au.com.yumait.blaksync.plist"))
     }
-    #[cfg(windows)]
-    {
-        let startup = dirs::data_dir()
-            .ok_or_else(|| Error::Config("Could not resolve the Windows startup folder.".into()))?
-            .join("Microsoft/Windows/Start Menu/Programs/Startup");
-        return Ok(startup.join("BlakSync.cmd"));
-    }
-    #[cfg(not(any(target_os = "macos", windows)))]
+    #[cfg(not(target_os = "macos"))]
     {
         let config = dirs::config_dir()
             .ok_or_else(|| Error::Config("Could not resolve the user config directory.".into()))?;
@@ -82,10 +128,7 @@ fn unit_contents() -> Result<String> {
     }
     #[cfg(windows)]
     {
-        return Ok(format!(
-            "@echo off\r\nstart \"\" \"{}\" tray\r\n",
-            exe.display()
-        ));
+        Ok(format!("\"{}\" tray", exe.display()))
     }
     #[cfg(not(any(target_os = "macos", windows)))]
     {
@@ -96,6 +139,7 @@ fn unit_contents() -> Result<String> {
     }
 }
 
+#[cfg(not(windows))]
 fn activate(path: &std::path::Path) -> Result<()> {
     #[cfg(target_os = "macos")]
     {
@@ -108,12 +152,7 @@ fn activate(path: &std::path::Path) -> Result<()> {
         let _ = status;
         Ok(())
     }
-    #[cfg(windows)]
-    {
-        let _ = path;
-        return Ok(());
-    }
-    #[cfg(not(any(target_os = "macos", windows)))]
+    #[cfg(not(target_os = "macos"))]
     {
         let _ = path;
         let _ = Command::new("systemctl")
@@ -126,6 +165,7 @@ fn activate(path: &std::path::Path) -> Result<()> {
     }
 }
 
+#[cfg(not(windows))]
 fn deactivate(path: &std::path::Path) -> Result<()> {
     #[cfg(target_os = "macos")]
     {
@@ -134,12 +174,7 @@ fn deactivate(path: &std::path::Path) -> Result<()> {
             .status();
         Ok(())
     }
-    #[cfg(windows)]
-    {
-        let _ = path;
-        return Ok(());
-    }
-    #[cfg(not(any(target_os = "macos", windows)))]
+    #[cfg(not(target_os = "macos"))]
     {
         let _ = path;
         let _ = Command::new("systemctl")

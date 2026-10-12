@@ -96,14 +96,17 @@ fn syncthing_url() -> String {
 
 fn spawn_gui(config_dir: &std::path::Path) -> Result<Child> {
     let exe = std::env::current_exe()?;
-    Command::new(exe)
+    let mut command = Command::new(exe);
+    command
         .args(["--config-dir", &config_dir.display().to_string(), "gui"])
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::null())
-        .kill_on_drop(true)
-        .spawn()
-        .map_err(Error::from)
+        .kill_on_drop(true);
+    // The tray has no console; keep the GUI server from opening one.
+    #[cfg(windows)]
+    command.creation_flags(crate::win::CREATE_NO_WINDOW);
+    command.spawn().map_err(Error::from)
 }
 
 async fn current_state(config_dir: &std::path::Path) -> TrayState {
@@ -131,9 +134,14 @@ fn open_gui() {
     let _ = if cfg!(target_os = "macos") {
         std::process::Command::new("open").arg(url).status()
     } else if cfg!(windows) {
-        std::process::Command::new("cmd")
-            .args(["/C", "start", "", url])
-            .status()
+        let mut command = std::process::Command::new("cmd");
+        command.args(["/C", "start", "", url]);
+        #[cfg(windows)]
+        {
+            use std::os::windows::process::CommandExt;
+            command.creation_flags(crate::win::CREATE_NO_WINDOW);
+        }
+        command.status()
     } else {
         std::process::Command::new("xdg-open").arg(url).status()
     };

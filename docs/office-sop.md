@@ -4,7 +4,7 @@ Two pages for a non-technical office. You do not need GitHub.
 
 ## Start
 
-1. On Windows or macOS, turn on **Start at login** in Settings, or use the tray icon.
+1. On Windows or macOS, turn on **Start at login** in Settings, or use the tray icon. On Windows this adds a `BlakSync` entry to the current user's Run key (`blaksync autostart enable` does the same); the tray starts without a console window.
 2. On Linux, enable the user service: `systemctl --user enable --now blaksync.service` (see `deploy/blaksync-user.service`).
 3. Open http://127.0.0.1:8385. The first run asks for the organisation name, an `Australia/…` timezone, this device's name, and a discovery choice (LAN, defaults, or Tailscale).
 4. You should not need a Syncthing API key. If the GUI cannot start, run `blaksync start` once so the config exists, then `blaksync gui`.

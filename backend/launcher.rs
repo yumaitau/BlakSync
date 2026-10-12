@@ -103,13 +103,18 @@ pub async fn spawn_syncthing(
     home: Option<&Path>,
 ) -> Result<(Child, PreparedLaunch)> {
     let prepared = prepare_syncthing(binary, home).await?;
-    let child = Command::new(&prepared.binary)
+    let mut command = Command::new(&prepared.binary);
+    command
         .args(serve_args(&prepared.home, &gui_address()))
         .env("STVERSIONEXTRA", "BlakSync")
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::null())
-        .kill_on_drop(true)
+        .kill_on_drop(true);
+    // The tray has no console; keep Syncthing from opening one.
+    #[cfg(windows)]
+    command.creation_flags(crate::win::CREATE_NO_WINDOW);
+    let child = command
         .spawn()
         .map_err(|error| executable_error(&prepared.binary, error))?;
     Ok((child, prepared))
@@ -185,9 +190,12 @@ fn serve_args(home: &Path, gui_address: &str) -> Vec<String> {
 }
 
 async fn run_output(binary: &str, args: &[String]) -> Result<String> {
-    let output = Command::new(binary)
-        .args(args)
-        .stdin(Stdio::null())
+    let mut command = Command::new(binary);
+    command.args(args).stdin(Stdio::null());
+    // Output is captured, so a console window would only flash (tray mode).
+    #[cfg(windows)]
+    command.creation_flags(crate::win::CREATE_NO_WINDOW);
+    let output = command
         .output()
         .await
         .map_err(|error| executable_error(binary, error))?;

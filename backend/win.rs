@@ -1,4 +1,5 @@
-//! Small Windows-only helpers: owner-only ACLs.
+//! Small Windows-only helpers: private ACLs, console detach, and the per-user
+//! Run key used for start-at-login.
 
 use std::ffi::OsStr;
 use std::io;
@@ -7,7 +8,8 @@ use std::path::Path;
 use std::ptr::{null, null_mut};
 
 use windows_sys::Win32::Foundation::{
-    CloseHandle, ERROR_INVALID_FUNCTION, ERROR_NOT_SUPPORTED, ERROR_SUCCESS, HANDLE, LocalFree,
+    CloseHandle, ERROR_FILE_NOT_FOUND, ERROR_INVALID_FUNCTION, ERROR_NOT_SUPPORTED, ERROR_SUCCESS,
+    HANDLE, LocalFree,
 };
 use windows_sys::Win32::Security::Authorization::{
     ConvertSidToStringSidW, ConvertStringSecurityDescriptorToSecurityDescriptorW, SDDL_REVISION_1,
@@ -17,9 +19,16 @@ use windows_sys::Win32::Security::{
     ACL, DACL_SECURITY_INFORMATION, GetSecurityDescriptorDacl, GetTokenInformation,
     PROTECTED_DACL_SECURITY_INFORMATION, PSECURITY_DESCRIPTOR, TOKEN_QUERY, TOKEN_USER, TokenUser,
 };
+use windows_sys::Win32::System::Console::{FreeConsole, GetConsoleProcessList};
+use windows_sys::Win32::System::Registry::{
+    HKEY_CURRENT_USER, REG_SZ, RRF_RT_REG_SZ, RegDeleteKeyValueW, RegGetValueW, RegSetKeyValueW,
+};
 use windows_sys::Win32::System::Threading::{GetCurrentProcess, OpenProcessToken};
 
 use crate::{Error, Result};
+
+/// `CREATE_NO_WINDOW`: run a console child without opening a console window.
+pub const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 
 fn wide(value: impl AsRef<OsStr>) -> Vec<u16> {
     value.as_ref().encode_wide().chain(Some(0)).collect()
@@ -121,6 +130,97 @@ fn current_user_sid() -> Result<String> {
         let sid = String::from_utf16_lossy(std::slice::from_raw_parts(text, end));
         LocalFree(text.cast());
         Ok(sid)
+    }
+}
+
+/// Close the console window when this process is its only user, as happens
+/// when Explorer or the Run key starts `blaksync.exe tray`. A console shared
+/// with a shell (cmd, PowerShell, Windows Terminal) is left alone.
+pub fn detach_owned_console() -> bool {
+    let mut processes = [0u32; 2];
+    // SAFETY: the buffer length passed matches the array.
+    unsafe {
+        let count = GetConsoleProcessList(processes.as_mut_ptr(), processes.len() as u32);
+        count == 1 && FreeConsole() != 0
+    }
+}
+
+pub fn hkcu_string_get(key: &str, name: &str) -> Result<Option<String>> {
+    let key = wide(key);
+    let name = wide(name);
+    // SAFETY: the first call sizes the buffer; the second writes at most `size` bytes.
+    unsafe {
+        let mut size = 0u32;
+        let code = RegGetValueW(
+            HKEY_CURRENT_USER,
+            key.as_ptr(),
+            name.as_ptr(),
+            RRF_RT_REG_SZ,
+            null_mut(),
+            null_mut(),
+            &mut size,
+        );
+        if code == ERROR_FILE_NOT_FOUND {
+            return Ok(None);
+        }
+        if code != ERROR_SUCCESS {
+            return Err(os_error(code));
+        }
+        let mut buffer = vec![0u16; (size as usize).div_ceil(2)];
+        let code = RegGetValueW(
+            HKEY_CURRENT_USER,
+            key.as_ptr(),
+            name.as_ptr(),
+            RRF_RT_REG_SZ,
+            null_mut(),
+            buffer.as_mut_ptr().cast(),
+            &mut size,
+        );
+        if code == ERROR_FILE_NOT_FOUND {
+            return Ok(None);
+        }
+        if code != ERROR_SUCCESS {
+            return Err(os_error(code));
+        }
+        let end = buffer
+            .iter()
+            .position(|&unit| unit == 0)
+            .unwrap_or(buffer.len());
+        Ok(Some(String::from_utf16_lossy(&buffer[..end])))
+    }
+}
+
+pub fn hkcu_string_set(key: &str, name: &str, value: &str) -> Result<()> {
+    let key = wide(key);
+    let name = wide(name);
+    let data = wide(value);
+    // SAFETY: `data` is a NUL-terminated UTF-16 buffer of the given byte length.
+    let code = unsafe {
+        RegSetKeyValueW(
+            HKEY_CURRENT_USER,
+            key.as_ptr(),
+            name.as_ptr(),
+            REG_SZ,
+            data.as_ptr().cast(),
+            (data.len() * 2) as u32,
+        )
+    };
+    if code != ERROR_SUCCESS {
+        return Err(os_error(code));
+    }
+    Ok(())
+}
+
+/// Returns whether a value was removed.
+pub fn hkcu_value_delete(key: &str, name: &str) -> Result<bool> {
+    let key = wide(key);
+    let name = wide(name);
+    // SAFETY: both strings are NUL-terminated UTF-16.
+    let code = unsafe { RegDeleteKeyValueW(HKEY_CURRENT_USER, key.as_ptr(), name.as_ptr()) };
+    match code {
+        ERROR_SUCCESS => Ok(true),
+        ERROR_FILE_NOT_FOUND => Ok(false),
+        code => Err(os_error(code)),
     }
 }
 

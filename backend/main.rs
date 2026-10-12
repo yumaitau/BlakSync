@@ -364,6 +364,13 @@ type CliResult<T> = std::result::Result<T, CliFailure>;
 #[tokio::main]
 async fn main() {
     let cli = Cli::parse();
+    // blaksync.exe is a console program. When the tray was started from the
+    // Run key or Explorer, its console window belongs to it alone: close it.
+    // From a terminal the console is shared and stays, so Ctrl-C still works.
+    #[cfg(windows)]
+    if matches!(cli.command, Command::Tray) {
+        blaksync::win::detach_owned_console();
+    }
     let json_mode = cli.json;
     match run(cli).await {
         Ok(output) => print_output(output, json_mode),

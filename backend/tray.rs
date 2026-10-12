@@ -9,7 +9,7 @@ use tokio::process::{Child, Command};
 use tokio::time::sleep;
 
 use crate::config::{default_config_dir, resolve_api_key};
-use crate::launcher::spawn_syncthing;
+use crate::launcher::{gui_address, spawn_syncthing};
 use crate::syncthing::SyncthingClient;
 use crate::{Error, Result};
 
@@ -76,7 +76,7 @@ pub async fn run_tray(config_dir: PathBuf, syncthing: Option<String>) -> Result<
 async fn wait_for_api(home: &std::path::Path) -> Result<()> {
     for _ in 0..40 {
         let key = resolve_api_key(home).ok();
-        let ready = match SyncthingClient::new(None, key.as_deref()) {
+        let ready = match SyncthingClient::new(Some(&syncthing_url()), key.as_deref()) {
             Ok(client) => client.device_id().await.is_ok(),
             Err(_) => false,
         };
@@ -88,6 +88,10 @@ async fn wait_for_api(home: &std::path::Path) -> Result<()> {
     Err(Error::Process(
         "Syncthing started but the local API was not ready.".into(),
     ))
+}
+
+fn syncthing_url() -> String {
+    format!("http://{}", gui_address())
 }
 
 fn spawn_gui(config_dir: &std::path::Path) -> Result<Child> {
@@ -104,7 +108,7 @@ fn spawn_gui(config_dir: &std::path::Path) -> Result<Child> {
 
 async fn current_state(config_dir: &std::path::Path) -> TrayState {
     let key = resolve_api_key(config_dir).ok();
-    let Ok(client) = SyncthingClient::new(None, key.as_deref()) else {
+    let Ok(client) = SyncthingClient::new(Some(&syncthing_url()), key.as_deref()) else {
         return TrayState::Paused;
     };
     let pending = client

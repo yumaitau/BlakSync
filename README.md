@@ -79,7 +79,7 @@ npm run build
 ./target/release/blaksync start
 ```
 
-On first run, the wrapper generates the platform config directory (`~/.config/blaksync` on Linux), prints the local GUI URL and certificate-derived device ID, then runs Syncthing in the foreground. The GUI is forced to `127.0.0.1:8384`. Stop with Ctrl-C. Override binary or config location when needed:
+On first run, the wrapper generates the platform config directory (`~/.config/blaksync` on Linux), prints the local GUI URL and certificate-derived device ID, then runs Syncthing in the foreground. The GUI is forced to `127.0.0.1:8384`; `BLAKSYNC_URL=http://127.0.0.1:PORT` moves `start` and `tray` to another loopback port, as it already does for the other commands. Stop with Ctrl-C. Override binary or config location when needed:
 
 ```sh
 ./target/release/blaksync start --syncthing /opt/syncthing --home /srv/blaksync/config

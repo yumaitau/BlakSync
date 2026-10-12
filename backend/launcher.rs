@@ -11,6 +11,23 @@ use crate::{Error, Result};
 
 const GUI_ADDRESS: &str = "127.0.0.1:8384";
 
+/// Syncthing's GUI address. `BLAKSYNC_URL` (which every other command already
+/// uses to reach Syncthing) may move it to another 127.0.0.1 port, for example
+/// to run a second local instance. Any other host is ignored, so the GUI is
+/// never bound off loopback.
+pub fn gui_address() -> String {
+    env::var("BLAKSYNC_URL")
+        .ok()
+        .and_then(|url| loopback_address(&url))
+        .unwrap_or_else(|| GUI_ADDRESS.into())
+}
+
+fn loopback_address(url: &str) -> Option<String> {
+    let address = url.trim().trim_end_matches('/').strip_prefix("http://")?;
+    let port = address.strip_prefix("127.0.0.1:")?.parse::<u16>().ok()?;
+    (port != 0).then(|| address.to_string())
+}
+
 #[derive(Clone, Debug)]
 pub struct LaunchResult {
     pub device_id: String,
@@ -21,13 +38,14 @@ pub struct LaunchResult {
 
 pub async fn launch_syncthing(binary: Option<&str>, home: Option<&Path>) -> Result<LaunchResult> {
     let prepared = prepare_syncthing(binary, home).await?;
-    println!("Syncthing GUI: http://{GUI_ADDRESS}");
+    let gui = gui_address();
+    println!("Syncthing GUI: http://{gui}");
     println!("Device ID: {}", prepared.device_id);
     println!("BlakSync config: {}", prepared.home.display());
     println!("Syncthing pin: {PINNED_SYNCTHING}");
 
     let status = Command::new(&prepared.binary)
-        .args(serve_args(&prepared.home))
+        .args(serve_args(&prepared.home, &gui))
         .env("STVERSIONEXTRA", "BlakSync")
         .stdin(Stdio::inherit())
         .stdout(Stdio::inherit())
@@ -38,7 +56,7 @@ pub async fn launch_syncthing(binary: Option<&str>, home: Option<&Path>) -> Resu
 
     Ok(LaunchResult {
         device_id: prepared.device_id,
-        gui_url: format!("http://{GUI_ADDRESS}"),
+        gui_url: format!("http://{gui}"),
         home: prepared.home,
         exit_code: status.code().unwrap_or(1),
     })
@@ -86,7 +104,7 @@ pub async fn spawn_syncthing(
 ) -> Result<(Child, PreparedLaunch)> {
     let prepared = prepare_syncthing(binary, home).await?;
     let child = Command::new(&prepared.binary)
-        .args(serve_args(&prepared.home))
+        .args(serve_args(&prepared.home, &gui_address()))
         .env("STVERSIONEXTRA", "BlakSync")
         .stdin(Stdio::null())
         .stdout(Stdio::null())
@@ -156,11 +174,11 @@ fn device_id_args(home: &Path) -> Vec<String> {
     vec!["device-id".into(), format!("--home={}", home.display())]
 }
 
-fn serve_args(home: &Path) -> Vec<String> {
+fn serve_args(home: &Path, gui_address: &str) -> Vec<String> {
     vec![
         "serve".into(),
         format!("--home={}", home.display()),
-        format!("--gui-address={GUI_ADDRESS}"),
+        format!("--gui-address={gui_address}"),
         "--no-browser".into(),
         "--no-port-probing".into(),
     ]
@@ -238,7 +256,7 @@ mod tests {
         assert!(generate_args(home).contains(&"--no-port-probing".into()));
         assert_eq!(device_id_args(home)[0], "device-id");
         assert_eq!(
-            serve_args(home),
+            serve_args(home, GUI_ADDRESS),
             vec![
                 "serve",
                 "--home=/tmp/blaksync",
@@ -257,5 +275,17 @@ mod tests {
         assert!(text.contains("install-syncthing.ps1"));
         #[cfg(not(windows))]
         assert!(text.contains("install-syncthing.sh"));
+    }
+
+    #[test]
+    fn gui_address_override_stays_on_loopback() {
+        assert_eq!(
+            loopback_address("http://127.0.0.1:18384/").as_deref(),
+            Some("127.0.0.1:18384")
+        );
+        assert_eq!(loopback_address("http://0.0.0.0:8384"), None);
+        assert_eq!(loopback_address("http://192.0.2.1:8384"), None);
+        assert_eq!(loopback_address("https://127.0.0.1:8384"), None);
+        assert_eq!(loopback_address("http://127.0.0.1:0"), None);
     }
 }

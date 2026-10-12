@@ -62,6 +62,12 @@ Install Rust 1.85 or newer. Node.js 22 or newer is needed only when building the
 bash scripts/install-syncthing.sh "$HOME/.config/blaksync/bin"
 ```
 
+On Windows, from PowerShell (no admin needed). It verifies the download against the release's SHA-256 list and installs `syncthing.exe` into `%APPDATA%\blaksync\bin`, or `-Destination DIR`:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\install-syncthing.ps1
+```
+
 See [docs/syncthing-pin.md](docs/syncthing-pin.md) to bump the pin. `blaksync --version` prints it. `blaksync start` refuses an unsupported major version.
 
 Build the Rust backend and GUI, then start Syncthing under BlakSync's dedicated config directory:

@@ -1,6 +1,7 @@
 use crate::{Error, Result};
 
-/// Supported Syncthing release. Bump this together with `scripts/install-syncthing.sh`.
+/// Supported Syncthing release. Bump this together with `scripts/install-syncthing.sh`
+/// and `scripts/install-syncthing.ps1`.
 pub const PINNED_SYNCTHING: &str = "2.1.3";
 
 /// CLI / `--version` footer. Keep in lockstep with `PINNED_SYNCTHING`.

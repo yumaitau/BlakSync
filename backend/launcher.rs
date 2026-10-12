@@ -192,10 +192,16 @@ async fn run_output(binary: &str, args: &[String]) -> Result<String> {
     Ok(String::from_utf8_lossy(&output.stdout).into_owned())
 }
 
+#[cfg(windows)]
+const INSTALL_HINT: &str =
+    "`powershell -NoProfile -ExecutionPolicy Bypass -File scripts\\install-syncthing.ps1`";
+#[cfg(not(windows))]
+const INSTALL_HINT: &str = "scripts/install-syncthing.sh";
+
 fn executable_error(binary: &str, error: std::io::Error) -> Error {
     if error.kind() == std::io::ErrorKind::NotFound {
         return Error::Process(format!(
-            "Syncthing executable not found: {binary}. Install the pinned {PINNED_SYNCTHING} build with scripts/install-syncthing.sh, or pass --syncthing PATH."
+            "Syncthing executable not found: {binary}. Install the pinned {PINNED_SYNCTHING} build with {INSTALL_HINT}, or pass --syncthing PATH."
         ));
     }
     Error::Io(error)
@@ -247,6 +253,9 @@ mod tests {
         );
         let text = missing.to_string();
         assert!(text.contains(PINNED_SYNCTHING));
+        #[cfg(windows)]
+        assert!(text.contains("install-syncthing.ps1"));
+        #[cfg(not(windows))]
         assert!(text.contains("install-syncthing.sh"));
     }
 }

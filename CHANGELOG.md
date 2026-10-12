@@ -22,7 +22,6 @@ User-facing notes in Australian English. Not a commit dump.
 - Windows: `office-folder` defaults to `%ProgramData%\BlakSync` and says how to set `BLAKSYNC_ORG_ROOT` when a root is not absolute.
 - Windows: `scripts/install-syncthing.ps1` installs the pinned Syncthing after a SHA-256 check, without admin. "Syncthing not found" points to it.
 - Windows: the tray no longer leaves a console window open, and Start at login uses the per-user Run key instead of a Startup-folder `.cmd`.
-- Windows: Syncthing runs with `--no-upgrade`, so it can no longer replace the pinned build with a newer release on its own.
 - Start-at-login and a tray status icon (Windows and macOS). Linux user systemd unit.
 - Printed pairing card, office SOP, and privacy notice.
 

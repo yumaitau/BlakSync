@@ -180,20 +180,13 @@ fn device_id_args(home: &Path) -> Vec<String> {
 }
 
 fn serve_args(home: &Path, gui_address: &str) -> Vec<String> {
-    #[allow(unused_mut)]
-    let mut args = vec![
+    vec![
         "serve".into(),
         format!("--home={}", home.display()),
         format!("--gui-address={gui_address}"),
         "--no-browser".into(),
         "--no-port-probing".into(),
-    ];
-    // Syncthing's auto-upgrade replaces the pinned syncthing.exe in place,
-    // seconds after first start, because the config `bin` folder is
-    // user-writable. Keep the pin.
-    #[cfg(windows)]
-    args.push("--no-upgrade".into());
-    args
+    ]
 }
 
 async fn run_output(binary: &str, args: &[String]) -> Result<String> {
@@ -270,10 +263,9 @@ mod tests {
         assert_eq!(generate_args(home)[0], "generate");
         assert!(generate_args(home).contains(&"--no-port-probing".into()));
         assert_eq!(device_id_args(home)[0], "device-id");
-        let serve = serve_args(home, GUI_ADDRESS);
         assert_eq!(
-            serve[..5],
-            [
+            serve_args(home, GUI_ADDRESS),
+            vec![
                 "serve",
                 "--home=/tmp/blaksync",
                 "--gui-address=127.0.0.1:8384",
@@ -281,10 +273,6 @@ mod tests {
                 "--no-port-probing",
             ]
         );
-        #[cfg(windows)]
-        assert_eq!(serve[5..], ["--no-upgrade"]);
-        #[cfg(not(windows))]
-        assert_eq!(serve.len(), 5);
         let missing = executable_error(
             "missing-syncthing",
             std::io::Error::new(std::io::ErrorKind::NotFound, "missing"),

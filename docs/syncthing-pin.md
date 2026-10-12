@@ -15,7 +15,7 @@ BlakSync wraps Syncthing. It does not fork it and does not reimplement the Block
 3. A `syncthing` next to the `blaksync` executable
 4. `syncthing` on `PATH` (not required if a bundled binary exists)
 
-On Windows, `scripts/install-syncthing.ps1` installs the pin into the config `bin` folder after checking it against the release's `sha256sum.txt.asc`. BlakSync starts it with `--no-upgrade`, because that folder is user-writable and Syncthing would otherwise replace the pinned binary with the newest release seconds after first start.
+On Windows, `scripts/install-syncthing.ps1` installs the pin into the config `bin` folder after checking it against the release's `sha256sum.txt.asc`. That folder is user-writable, so Syncthing's own auto-upgrade keeps it on the newest release of the same major version; the pin is the install baseline, not a ceiling.
 
 ## How to bump
 

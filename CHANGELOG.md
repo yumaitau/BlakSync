@@ -19,6 +19,7 @@ User-facing notes in Australian English. Not a commit dump.
 - Optional local HTTPS for the GUI. Optional in-app version check against yumaitau/BlakSync only.
 - Config backup and restore that refuse the git work tree.
 - Windows: `key.pem`, `config.xml`, `https-key.pem`, and the rest of the config folder are limited to the current user, SYSTEM, and Administrators.
+- Windows: `office-folder` defaults to `%ProgramData%\BlakSync` and says how to set `BLAKSYNC_ORG_ROOT` when a root is not absolute.
 - Start-at-login and a tray status icon (Windows and macOS). Linux user systemd unit.
 - Printed pairing card, office SOP, and privacy notice.
 

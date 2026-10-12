@@ -11,6 +11,27 @@ use crate::{Error, Result};
 
 pub const DEFAULT_ORG_ROOT: &str = "/srv/blaksync";
 
+#[cfg(windows)]
+const ORG_ROOT_EXAMPLE: &str = r"D:\BlakSync";
+#[cfg(not(windows))]
+const ORG_ROOT_EXAMPLE: &str = DEFAULT_ORG_ROOT;
+
+/// Organisation root used by `office-folder` when `BLAKSYNC_ORG_ROOT` is unset:
+/// `/srv/blaksync`, or `%ProgramData%\BlakSync` on Windows, which exists on
+/// every machine.
+pub fn default_org_root() -> PathBuf {
+    #[cfg(windows)]
+    {
+        let base = std::env::var_os("ProgramData")
+            .map(PathBuf::from)
+            .filter(|path| path.is_absolute())
+            .unwrap_or_else(|| PathBuf::from(r"C:\ProgramData"));
+        base.join("BlakSync")
+    }
+    #[cfg(not(windows))]
+    PathBuf::from(DEFAULT_ORG_ROOT)
+}
+
 #[derive(Clone, Debug)]
 pub struct SyncthingClient {
     base_url: String,
@@ -244,8 +265,17 @@ impl SyncthingClient {
         org_root: Option<&Path>,
         label: Option<&str>,
     ) -> Result<Value> {
-        let root = org_root.unwrap_or_else(|| Path::new(DEFAULT_ORG_ROOT));
+        let default_root = default_org_root();
+        let root = org_root.unwrap_or(&default_root);
         let path = office_folder_path(folder_id, root)?;
+        // ProgramData lets every local user read new subfolders. Create a
+        // missing root as owner-only instead; an existing root is left as
+        // the administrator set it up.
+        #[cfg(windows)]
+        if !root.exists() {
+            std::fs::create_dir_all(root)?;
+            crate::config::set_mode(root, 0o700)?;
+        }
         self.add_folder(folder_id, &path.to_string_lossy(), label)
             .await
     }
@@ -668,9 +698,11 @@ pub fn office_folder_path(folder_id: &str, org_root: &Path) -> Result<PathBuf> {
         ));
     }
     if !org_root.is_absolute() {
-        return Err(Error::Config(
-            "The organisation root must be an absolute path".into(),
-        ));
+        return Err(Error::Config(format!(
+            "The organisation root must be an absolute path, not `{}`. Set BLAKSYNC_ORG_ROOT to an absolute, org-owned directory such as {ORG_ROOT_EXAMPLE}, or unset it to use {}.",
+            org_root.display(),
+            default_org_root().display()
+        )));
     }
     if org_root
         .components()
@@ -915,7 +947,11 @@ mod tests {
             root.join("folders").join("country-docs")
         );
         assert!(office_folder_path("../escape", root).is_err());
-        assert!(office_folder_path("valid", Path::new("relative")).is_err());
+        let error = office_folder_path("valid", Path::new("relative"))
+            .unwrap_err()
+            .to_string();
+        assert!(error.contains("BLAKSYNC_ORG_ROOT"));
+        assert!(default_org_root().is_absolute());
     }
 
     #[test]

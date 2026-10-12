@@ -26,7 +26,7 @@ From this repository, add each accepted folder to the standard disk layout:
 /usr/local/bin/blaksync health
 ```
 
-`office-folder` always creates a `sendreceive` Syncthing configuration at `/srv/blaksync/folders/<folder-id>`. Set `BLAKSYNC_ORG_ROOT` to another absolute, org-owned mount before running it if `/srv` is not on the intended disk. Create and ownership-adjust that root first. The `health` output contains only folder IDs, state, aggregate out-of-sync item counts, free bytes, device IDs, connection state, and last-seen times—never file names.
+`office-folder` always creates a `sendreceive` Syncthing configuration at `<org root>/folders/<folder-id>`. The org root defaults to `/srv/blaksync`, or `%ProgramData%\BlakSync` (normally `C:\ProgramData\BlakSync`) on Windows. Set `BLAKSYNC_ORG_ROOT` to another absolute, org-owned mount before running it if that is not on the intended disk. Create and ownership-adjust that root first. On Windows, if the root does not exist yet, `office-folder` creates it with access for the current user, SYSTEM, and Administrators only; grant a service account yourself. The `health` output contains only folder IDs, state, aggregate out-of-sync item counts, free bytes, device IDs, connection state, and last-seen times—never file names.
 
 ## Tailscale-only transport
 
@@ -47,7 +47,8 @@ This is optional. Syncthing still provides authenticated, encrypted transport; T
 2. Grant that account and org administrators only on `D:\BlakSync` (config `0700` equivalent, no Users write).
 3. `winsw install deploy\blaksync-office.xml` then start the service. Startup type is **Automatic**. Recovery restarts on failure.
 4. The command line is `blaksync start --home D:\BlakSync\config`. The GUI stays on `127.0.0.1`. There is no API key on the command line.
-5. After reboot, `blaksync health` (with `BLAKSYNC_CONFIG_DIR=D:\BlakSync\config` if needed) and the Health page should work. A field laptop can still sync.
+5. Add folders with `office-folder`, with `BLAKSYNC_ORG_ROOT=D:\BlakSync` so they land in `D:\BlakSync\folders\<folder-id>`. Without it they go to `%ProgramData%\BlakSync\folders`, which is on the system disk.
+6. After reboot, `blaksync health` (with `BLAKSYNC_CONFIG_DIR=D:\BlakSync\config` if needed) and the Health page should work. A field laptop can still sync.
 
 ## Reboot-safe binary update
 

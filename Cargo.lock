@@ -265,6 +265,7 @@ dependencies = [
  "tower-http 0.7.0",
  "tray-icon",
  "walkdir",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]

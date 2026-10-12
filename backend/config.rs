@@ -129,7 +129,13 @@ pub fn set_mode(path: &Path, mode: u32) -> Result<()> {
         use std::os::unix::fs::PermissionsExt;
         fs::set_permissions(path, fs::Permissions::from_mode(mode))?;
     }
-    #[cfg(not(unix))]
+    // Owner-only modes become an owner/SYSTEM/Administrators ACL that does
+    // not inherit from the parent folder.
+    #[cfg(windows)]
+    if mode & 0o077 == 0 {
+        crate::win::restrict_to_owner(path)?;
+    }
+    #[cfg(not(any(unix, windows)))]
     let _ = (path, mode);
     Ok(())
 }
@@ -205,7 +211,10 @@ fn secure_file(path: &Path) -> Result<File> {
         use std::os::unix::fs::OpenOptionsExt;
         options.mode(0o600);
     }
-    Ok(options.open(path)?)
+    let file = options.open(path)?;
+    #[cfg(windows)]
+    set_mode(path, 0o600)?;
+    Ok(file)
 }
 
 #[cfg(test)]

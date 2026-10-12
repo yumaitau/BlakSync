@@ -182,6 +182,8 @@ These are device identity or live config. They stay on the device. `.gitignore` 
 | `config.xml` | Folder paths, paired device IDs, and the GUI **API key** (`<apikey>`). |
 | `.env` and anything with API keys or tokens | Same class of secret. Use `.env.example` with empty values if you must document names. |
 
+BlakSync keeps these owner-only: mode `0600` (directory `0700`) on Linux and macOS; on Windows an ACL for the current user, SYSTEM, and Administrators only, not inherited from the parent folder.
+
 Do not commit a copy "just for the office node backup". Copy those files onto the office disk with the same permissions you would give the live process, not into this repository.
 
 If one of those files lands in git: treat it as leaked, revoke or rotate ([docs/threat-model.md](docs/threat-model.md)), and scrub history with a maintainer. Deleting it in a follow-up commit is not enough.

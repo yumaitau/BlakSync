@@ -13,5 +13,7 @@ pub mod tls;
 pub mod tray;
 pub mod updates;
 pub mod version;
+#[cfg(windows)]
+pub mod win;
 
 pub use error::{Error, Result};

@@ -64,6 +64,13 @@ pub async fn prepare_syncthing(
     if !home.join("config.xml").is_file() {
         run_output(&binary, &generate_args(&home)).await?;
     }
+    #[cfg(windows)]
+    for name in ["key.pem", "cert.pem", "config.xml"] {
+        let path = home.join(name);
+        if path.is_file() {
+            crate::config::set_mode(&path, 0o600)?;
+        }
+    }
     let device_id = run_output(&binary, &device_id_args(&home)).await?;
     let device_id = require_device_id(device_id.trim())?;
     Ok(PreparedLaunch {
@@ -207,7 +214,9 @@ fn set_private_directory(path: &Path) -> Result<()> {
         use std::os::unix::fs::PermissionsExt;
         std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o700))?;
     }
-    #[cfg(not(unix))]
+    #[cfg(windows)]
+    crate::config::set_mode(path, 0o700)?;
+    #[cfg(not(any(unix, windows)))]
     let _ = path;
     Ok(())
 }

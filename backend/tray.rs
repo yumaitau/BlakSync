@@ -177,7 +177,7 @@ fn native_tray_blocking(
 ) -> Result<()> {
     use std::time::Instant;
 
-    use tao::event_loop::{ControlFlow, EventLoop};
+    use tao::event_loop::ControlFlow;
     use tray_icon::menu::{Menu, MenuEvent, MenuItem, PredefinedMenuItem};
     use tray_icon::{Icon, TrayIconBuilder};
 
@@ -209,7 +209,16 @@ fn native_tray_blocking(
         .map_err(|error| Error::Process(format!("Could not show the tray icon: {error}")))?;
 
     let menu_channel = MenuEvent::receiver();
-    let event_loop = EventLoop::new();
+    // The tray runs on a `spawn_blocking` worker, not the process main thread;
+    // tao panics on Windows unless it is told that is intended.
+    #[cfg(windows)]
+    let event_loop = {
+        use tao::event_loop::EventLoopBuilder;
+        use tao::platform::windows::EventLoopBuilderExtWindows;
+        EventLoopBuilder::new().with_any_thread(true).build()
+    };
+    #[cfg(not(windows))]
+    let event_loop = tao::event_loop::EventLoop::new();
     let mut last_poll = Instant::now();
     let runtime = tokio::runtime::Handle::try_current().ok();
     event_loop.run(move |_, _, control_flow| {

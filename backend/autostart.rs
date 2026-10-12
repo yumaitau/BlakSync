@@ -1,5 +1,6 @@
 use std::fs;
 use std::path::PathBuf;
+#[cfg(not(windows))]
 use std::process::Command;
 
 use crate::config::set_mode;

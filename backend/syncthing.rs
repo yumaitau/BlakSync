@@ -906,11 +906,15 @@ mod tests {
 
     #[test]
     fn validates_office_folder_path() {
+        #[cfg(windows)]
+        let root = Path::new(r"D:\org-owned");
+        #[cfg(not(windows))]
+        let root = Path::new("/org-owned");
         assert_eq!(
-            office_folder_path("country-docs", Path::new("/org-owned")).unwrap(),
-            PathBuf::from("/org-owned/folders/country-docs")
+            office_folder_path("country-docs", root).unwrap(),
+            root.join("folders").join("country-docs")
         );
-        assert!(office_folder_path("../escape", Path::new("/org-owned")).is_err());
+        assert!(office_folder_path("../escape", root).is_err());
         assert!(office_folder_path("valid", Path::new("relative")).is_err());
     }
 

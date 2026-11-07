@@ -36,7 +36,7 @@ Upstream: https://github.com/syncthing/syncthing
 - No account, no subscription, and no vendor-controlled copy of the files.
 - Org profile, roles, and an access note on each shared folder.
 - Local web GUI plus a CLI. Discovery via local LAN and optional global discovery the org can turn off.
-- Self-hosted CI on `runs-on: [self-hosted, linux]`.
+- CI on the GitHub-hosted `ubuntu-24.04-arm` runner (public repository).
 
 ## What v1 does not do
 
@@ -164,7 +164,7 @@ Unsharing removes that device from the folder and stops subsequent updates. It d
 
 ## Manual two-device acceptance test
 
-1. Start Syncthing with `blaksync start` on two machines. Confirm `device-id` returns the same ID shown by Syncthing. No API key export is required after `start`. CI also runs `scripts/e2e-two-device.sh` on the self-hosted runner.
+1. Start Syncthing with `blaksync start` on two machines. Confirm `device-id` returns the same ID shown by Syncthing. No API key export is required after `start`. The nightly e2e workflow (`e2e-nightly.yml`) runs `scripts/e2e-two-device.sh`.
 2. Run `add-device` on both machines. Confirm a third, unaccepted Syncthing device is absent from `devices` and cannot list or request `sync-test`.
 3. Add and share `sync-test` on A. Confirm B reports the offer but receives no files before `accept-folder` is run on B.
 4. On A, create a 100 MiB test file without uploading it anywhere: `dd if=/dev/urandom of=sync-test/payload.bin bs=1M count=100 status=progress`.
@@ -204,9 +204,9 @@ Read [docs/threat-model.md](docs/threat-model.md) before treating a device as go
 - **Online requirement** — if every copy is offline, nobody can pull. An office node is an always-on disk, not a cloud.
 - **Unlocked disk** — there is no at-rest encryption from Syncthing. Full-disk encryption is the org's job.
 
-## Secret scan (self-hosted)
+## Secret scan
 
-Pull requests and pushes run the Rust history scanner and Gitleaks on `runs-on: [self-hosted, linux]`. The runner scans the tree locally. Nothing is uploaded to a SaaS secret scanner.
+Pull requests and pushes run the Rust history scanner and Gitleaks on the GitHub-hosted `ubuntu-24.04-arm` runner. The runner scans the checkout itself. Nothing is uploaded to a SaaS secret scanner.
 
 A dummy `key.pem` committed on a test branch must fail that job. Locally:
 

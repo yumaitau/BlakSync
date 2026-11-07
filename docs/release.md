@@ -15,7 +15,7 @@ They must match. CI fails if they drift (`scripts/check-versions.sh`).
 2. Set both version files to `0.2.0`.
 3. Move the `[Unreleased]` notes in `CHANGELOG.md` under `## [0.2.0] — YYYY-MM-DD`. Use Australian English. List user-facing changes, not a commit dump.
 4. Run the usual checks in `CONTRIBUTING.md`.
-5. Open a pull request. Wait for self-hosted CI.
+5. Open a pull request. Wait for CI.
 6. Merge.
 7. Create a signed tag:
 
@@ -24,7 +24,7 @@ git tag -s v0.2.0 -m "BlakSync 0.2.0"
 git push origin v0.2.0
 ```
 
-8. The release workflow publishes artefacts and `SHA256SUMS` when secrets are present on the self-hosted runner. Signing keys never go in git.
+8. The release workflow publishes artefacts and `SHA256SUMS` when the signing secrets are set. Signing keys never go in git.
 
 ## Tag message
 

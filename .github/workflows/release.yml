@@ -1,4 +1,4 @@
-# Tag vX.Y.Z on the self-hosted runner. Signing secrets stay on the runner.
+# Tag vX.Y.Z. Runs on the GitHub-hosted ubuntu-24.04-arm runner (public repository).
 name: Release
 
 on:
@@ -10,13 +10,13 @@ permissions:
   contents: write
 
 concurrency:
-  group: blaksync-release-self-hosted
+  group: blaksync-release
   cancel-in-progress: false
 
 jobs:
   package:
     name: Package signed artefacts
-    runs-on: [self-hosted, linux]
+    runs-on: ubuntu-24.04-arm
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -41,13 +41,13 @@ jobs:
           WINDOWS_PFX: ${{ secrets.WINDOWS_PFX }}
         run: |
           set -euo pipefail
-          echo "Place platform signing tools on the self-hosted runner."
+          echo "Platform signing tools are not installed on this runner."
           echo "Linux artefact is the tarball plus SHA256SUMS."
           if [[ -n "${WINDOWS_PFX:-}" ]]; then
-            echo "Windows Authenticode secret is present on the runner."
+            echo "Windows Authenticode secret is present."
           fi
           if [[ -n "${MACOS_SIGN_IDENTITY:-}" ]]; then
-            echo "macOS notarisation identity is present on the runner."
+            echo "macOS notarisation identity is present."
           fi
 
       - name: Publish GitHub Release

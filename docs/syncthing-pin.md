@@ -26,4 +26,4 @@ On Windows, `scripts/install-syncthing.ps1` installs the pin into the config `bi
 5. Run `scripts/e2e-two-device.sh` (device-id, add-folder, pair, health).
 6. Confirm `blaksync start` still refuses a 1.x binary.
 
-Keep CI on `runs-on: [self-hosted, linux]`.
+CI runs on the GitHub-hosted `ubuntu-24.04-arm` runner.

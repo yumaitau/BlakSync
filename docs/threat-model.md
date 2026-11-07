@@ -155,7 +155,7 @@ A leaked API key without a leaked `key.pem` does not impersonate the device to p
 
 ## What CI is for
 
-CI on this repo runs Gitleaks **on the self-hosted runner**. The tree is not uploaded to a SaaS secret scanner. Every run also commits a dummy `key.pem` in a throwaway git repo and requires that scan to fail, so a broken detector cannot stay green. Real `cert.pem`, `key.pem`, and `config.xml` with API keys must never be committed — see the README.
+CI on this repo runs Gitleaks on the GitHub-hosted runner, against the checkout. The tree is not uploaded to a SaaS secret scanner. Every run also commits a dummy `key.pem` in a throwaway git repo and requires that scan to fail, so a broken detector cannot stay green. Real `cert.pem`, `key.pem`, and `config.xml` with API keys must never be committed — see the README.
 
 To replay the dummy-key failure on a real branch:
 
